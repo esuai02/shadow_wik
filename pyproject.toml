@@ -4,16 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shadow-wik"
-version = "0.1.0"
-description = "Market persona, hidden-flow, regime-transition, and Jev scenario engine"
+version = "0.2.0"
+description = "Market persona, hidden-flow, sensory fingerprint, Jev, and pattern paper-trading engine"
 requires-python = ">=3.11"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "shadow_wik"}]
-keywords = ["trading", "market-microstructure", "jev", "regime", "personas"]
+keywords = ["trading", "market-microstructure", "jev", "regime", "personas", "paper-trading"]
 
 [project.scripts]
 shadow-wik = "shadow_wik.cli:main"
+shadow-paper = "shadow_wik.paper_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
