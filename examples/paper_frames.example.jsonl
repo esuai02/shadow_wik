@@ -1,0 +1,3 @@
+{"symbol":"DEMO","timestamp":"2026-09-24T10:00:00+09:00","price":100.0,"scores":{"EDGE":78,"FLOW":74,"STRUCTURE":76,"SAFETY":68,"TIMING":84},"jev_response":{"answers":{"breakout_next_window":{"noul":0.74}}}}
+{"symbol":"DEMO","timestamp":"2026-09-24T10:00:30+09:00","price":100.5,"scores":{"EDGE":80,"FLOW":77,"STRUCTURE":78,"SAFETY":67,"TIMING":86},"jev_response":{"answers":{"breakout_next_window":{"noul":0.76}}}}
+{"symbol":"DEMO","timestamp":"2026-09-24T10:01:00+09:00","price":101.4,"scores":{"EDGE":84,"FLOW":81,"STRUCTURE":80,"SAFETY":65,"TIMING":90},"jev_response":{"answers":{"breakout_next_window":{"noul":0.81}}}}
