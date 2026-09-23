@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "kind": "execution_graph",
+  "run_id": "shadow-sensory-v1",
+  "revision": 1,
+  "locale": "ko",
+  "intent_file": "intent.md",
+  "intent_sha256": "79b06b352e5532fea68f6f0fabf655541060cd9afce4dd63e8ec2265e03a7d3e",
+  "mission": "실시간 시장 상태를 검증 가능한 감각 신호로 바꾸고 거래 경험으로 시각·확률·규칙을 교정한다.",
+  "focus": "M3",
+  "nodes": [
+    {
+      "id": "M1",
+      "label": "관측 신뢰성",
+      "outcome": "MarketSnapshot 입력이 범위·시점·출처 정합성을 지킨다.",
+      "depends_on": [],
+      "review_question": "실시간 입력이 오래된 화면이나 다른 시점 API 값과 섞일 위험이 남아 있는가?",
+      "artifacts": ["src/shadow_wik/models.py", "src/shadow_wik/features.py"],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [],
+      "minor_limit": 0,
+      "criteria": [{
+        "id": "C1",
+        "statement": "객관 관측값은 정규화되고 측정/추론 경계를 유지한다.",
+        "method": "PYTHONPATH=src python -m unittest discover -s tests -v",
+        "target": "관련 단위 테스트 실패 0",
+        "evidence_types": ["test"],
+        "benchmark_required": false,
+        "benchmark_ids": []
+      }]
+    },
+    {
+      "id": "M2",
+      "label": "시장 의미와 확률",
+      "outcome": "Persona·Regime·Catalyst·Jev가 compact state에서 분리되어 판단된다.",
+      "depends_on": ["M1"],
+      "review_question": "Jev raw probability가 실제 승률처럼 오해될 여지가 남아 있는가?",
+      "artifacts": ["src/shadow_wik/engine.py", "src/shadow_wik/jev.py", "src/shadow_wik/signals.py"],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [],
+      "minor_limit": 0,
+      "criteria": [{
+        "id": "C2",
+        "statement": "Jev는 측정 계층이 아니라 판단 계층이며 raw probability와 calibration이 분리된다.",
+        "method": "PYTHONPATH=src python -m unittest discover -s tests -v",
+        "target": "계약 테스트 실패 0",
+        "evidence_types": ["test"],
+        "benchmark_required": false,
+        "benchmark_ids": []
+      }]
+    },
+    {
+      "id": "M3",
+      "label": "감각 시각화",
+      "outcome": "숫자를 읽지 않아도 시장의 압력·속도·안정성·불확실성을 일관되게 느낄 수 있는 상태값을 만든다.",
+      "depends_on": ["M2"],
+      "review_question": "실측/추론/모델확률/Unknown을 시각적으로 혼동시키는 표현이 있는가?",
+      "artifacts": ["src/shadow_wik/visual_grammar.py"],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [],
+      "minor_limit": 0,
+      "criteria": [{
+        "id": "C3",
+        "statement": "각 시각 cue는 0~100 강도, 변화속도, 안정성, evidence style을 가지며 inferred와 derived가 구분된다.",
+        "method": "PYTHONPATH=src python -m unittest tests/test_visual_grammar.py -v",
+        "target": "시각문법 테스트 실패 0",
+        "evidence_types": ["test"],
+        "benchmark_required": false,
+        "benchmark_ids": []
+      }]
+    },
+    {
+      "id": "M4",
+      "label": "경험 학습 Harness",
+      "outcome": "거래 경험을 Evidence로 축적하고 반복된 동일 오류만 수정 후보로 승격한다.",
+      "depends_on": ["M3"],
+      "review_question": "이 수정 후보는 반복된 Evidence인가, 최근 한 번의 경험에 대한 과잉반응인가?",
+      "artifacts": ["src/shadow_wik/experience_harness.py", "evidence.jsonl"],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [],
+      "minor_limit": 0,
+      "criteria": [{
+        "id": "C4",
+        "statement": "단일 경험은 자동 수정하지 않고, 반복된 동일 이슈만 candidate-only 제안을 만든다.",
+        "method": "PYTHONPATH=src python -m unittest tests/test_experience_harness.py -v",
+        "target": "Harness 테스트 실패 0 및 auto_apply=false",
+        "evidence_types": ["test"],
+        "benchmark_required": false,
+        "benchmark_ids": []
+      }]
+    }
+  ]
+}
