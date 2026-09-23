@@ -4,6 +4,7 @@ from dataclasses import asdict
 from typing import Any
 
 from .features import compute_features
+from .fingerprint import build_breakout_long_fingerprint
 from .jev import JevClient, build_questions
 from .models import MarketSnapshot
 from .personas import infer_market_persona_clusters, infer_position_personas
@@ -73,6 +74,12 @@ class ShadowEngine:
         if jev is not None:
             result["jev"] = jev.evaluate(jev_state, build_questions())
 
+        fingerprint = build_breakout_long_fingerprint(result["features"], result["jev"])
+        result["fingerprint"] = {
+            "mode": fingerprint.mode,
+            "scores": fingerprint.scores(),
+            "note": "Synthetic v1 mapping; higher is better on every human-facing axis and values are not calibrated win probabilities.",
+        }
         result["visual"] = build_visual_state(
             result["features"],
             flow_persistence=s.flow_persistence,
