@@ -2,12 +2,12 @@
   "schema_version": 1,
   "kind": "execution_graph",
   "run_id": "shadow-sensory-v1",
-  "revision": 1,
+  "revision": 2,
   "locale": "ko",
   "intent_file": "intent.md",
-  "intent_sha256": "79b06b352e5532fea68f6f0fabf655541060cd9afce4dd63e8ec2265e03a7d3e",
-  "mission": "실시간 시장 상태를 검증 가능한 감각 신호로 바꾸고 거래 경험으로 시각·확률·규칙을 교정한다.",
-  "focus": "M3",
+  "intent_sha256": "7635e62e99a9fa74efbc2fd253f805329f3594bdaa318c46e7b8894a06ceb760",
+  "mission": "실시간 시장 상태를 감각 신호로 바꾸고 특정 패턴을 가상 체결하여 실현 수익성으로 교정한다.",
+  "focus": "M5",
   "nodes": [
     {
       "id": "M1",
@@ -57,16 +57,16 @@
       "outcome": "숫자를 읽지 않아도 시장의 압력·속도·안정성·불확실성을 일관되게 느낄 수 있는 상태값을 만든다.",
       "depends_on": ["M2"],
       "review_question": "실측/추론/모델확률/Unknown을 시각적으로 혼동시키는 표현이 있는가?",
-      "artifacts": ["src/shadow_wik/visual_grammar.py"],
+      "artifacts": ["src/shadow_wik/visual_grammar.py", "src/shadow_wik/fingerprint.py"],
       "maker": "host-maker",
       "review": "separated",
       "human_holds": [],
       "minor_limit": 0,
       "criteria": [{
         "id": "C3",
-        "statement": "각 시각 cue는 0~100 강도, 변화속도, 안정성, evidence style을 가지며 inferred와 derived가 구분된다.",
-        "method": "PYTHONPATH=src python -m unittest tests/test_visual_grammar.py -v",
-        "target": "시각문법 테스트 실패 0",
+        "statement": "사람이 보는 핵심 패턴 축은 0~100이며 모두 높을수록 좋은 방향으로 정규화된다.",
+        "method": "PYTHONPATH=src python -m unittest tests/test_fingerprint.py tests/test_visual_grammar.py -v",
+        "target": "시각문법/fingerprint 테스트 실패 0",
         "evidence_types": ["test"],
         "benchmark_required": false,
         "benchmark_ids": []
@@ -92,6 +92,47 @@
         "benchmark_required": false,
         "benchmark_ids": []
       }]
+    },
+    {
+      "id": "M5",
+      "label": "패턴 가상체결 검증",
+      "outcome": "특정 패턴이 발생한 순간 가상 진입하고 이후 가격으로 비용 포함 수익률을 계산해 패턴별 실현 성과를 축적한다.",
+      "depends_on": ["M4"],
+      "review_question": "현재 패턴의 성과는 실제로 전향적으로 기록된 것인가, 아니면 사후 차트선택의 결과인가?",
+      "artifacts": ["src/shadow_wik/paper_trading.py", "src/shadow_wik/paper_cli.py", "config/patterns.example.json"],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [],
+      "minor_limit": 0,
+      "criteria": [
+        {
+          "id": "C5A",
+          "statement": "패턴 임계값 성립 시점에만 가상 포지션이 열리고 TP/SL/시간/패턴붕괴 규칙으로 닫힌다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_paper_trading.py -v",
+          "target": "가상체결 상태전이 테스트 실패 0",
+          "evidence_types": ["test"],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C5B",
+          "statement": "가상 성과는 수수료·슬리피지를 반영하고 패턴별 수익률/승률/profit factor/MFE/MAE를 계산한다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_paper_trading.py -v",
+          "target": "비용/성과집계 테스트 실패 0",
+          "evidence_types": ["test"],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C5C",
+          "statement": "예시 패턴은 SYNTHETIC 가설로 표시되고 어떤 코드 경로도 브로커 주문을 전송하지 않는다.",
+          "method": "Inspect PatternRule hypothesis_status and PaperTradingHarness public methods; run unit tests.",
+          "target": "hypothesis_status=synthetic 및 broker/order API 없음",
+          "evidence_types": ["test", "observation"],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
     }
   ]
 }
