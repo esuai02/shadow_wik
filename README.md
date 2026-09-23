@@ -4,6 +4,57 @@ Evidence-first market persona and regime-transition engine with optional **TypeS
 
 The project converts the investment framework developed in conversation into a small, testable system. It does **not** treat the trader's feelings as the primary object. It treats a position as one node inside a market of competing participant clusters and asks what order-flow pressure those clusters can create next.
 
+## Fast local runtime
+
+The default local path is **zero-install**: Python 3.11+ is enough. No package install or Docker is required for the core engine.
+
+```bash
+git clone https://github.com/esuai02/shadow_wik.git
+cd shadow_wik
+
+python run.py doctor
+python run.py demo
+python run.py test
+```
+
+If your system exposes Python as `python3`, use `python3 run.py ...`. On Windows, `py run.py ...` also works when the Python launcher is installed.
+
+Useful commands:
+
+```bash
+# dry analysis; writes full output to .shadow/latest_analysis.json
+python run.py analyze
+
+# live Jev analysis; run after copying .env.example to .env and setting TYPESAFE_API_KEY
+python run.py analyze --jev
+
+# replay pattern-triggered paper trades
+python run.py paper examples/paper_frames.example.jsonl
+
+# continuous feed-agnostic runtime: one JSON object per line on stdin
+your_feed | python run.py stream --patterns config/patterns.example.json
+
+# same stream with live Jev
+your_feed | python run.py stream --jev --patterns config/patterns.example.json
+```
+
+`stream` expects each line to contain `price` plus either the MarketSnapshot fields directly or a nested `snapshot` object. It emits a compact JSON line containing the five-axis fingerprint, signals, and any paper-trade open/close events.
+
+Runtime state is kept under `.shadow/` and ignored by Git. This is the intended local handoff point for a future browser/chart capture process or broker market-data websocket. It does **not** send real orders.
+
+Optional shortcuts:
+
+```bash
+make demo
+make test
+
+# POSIX shell
+sh scripts/dev.sh demo
+
+# PowerShell
+powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 demo
+```
+
 ## Core principles
 
 1. **Analyze positions, not identity.** The unit is `position × recent experience × market regime`, not a permanent personality label.
