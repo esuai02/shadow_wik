@@ -8,10 +8,16 @@ from .jev import JevClient, build_questions
 from .models import MarketSnapshot
 from .personas import infer_market_persona_clusters, infer_position_personas
 from .signals import build_signals
+from .visual_grammar import build_visual_state
 
 
 class ShadowEngine:
-    def analyze(self, snapshot: MarketSnapshot, jev: JevClient | None = None) -> dict[str, Any]:
+    def analyze(
+        self,
+        snapshot: MarketSnapshot,
+        jev: JevClient | None = None,
+        previous_features: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
         s = snapshot.normalized()
         features = compute_features(s)
         market_personas = infer_market_persona_clusters(s, features)
@@ -66,5 +72,14 @@ class ShadowEngine:
         }
         if jev is not None:
             result["jev"] = jev.evaluate(jev_state, build_questions())
-        result["signals"] = [x.to_dict() for x in build_signals(result["features"], result["jev"])]
+
+        result["visual"] = build_visual_state(
+            result["features"],
+            flow_persistence=s.flow_persistence,
+            jev_response=result["jev"],
+            previous_features=previous_features,
+        ).to_dict()
+        result["signals"] = [
+            x.to_dict() for x in build_signals(result["features"], result["jev"])
+        ]
         return result
