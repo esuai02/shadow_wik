@@ -224,3 +224,44 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
 The first version deliberately has no broker or news-feed dependency. Feed adapters should be added only after their source contracts are known. This keeps the core state model testable and prevents a data-vendor choice from becoming architecture.
+
+
+## Sensory fingerprint and prospective paper trading
+
+`ShadowEngine.analyze()` now exposes a human-facing five-axis fingerprint:
+
+- `EDGE`
+- `FLOW`
+- `STRUCTURE`
+- `SAFETY`
+- `TIMING`
+
+All five axes are normalized so **higher is better** for the configured pattern context. The current mapping is `breakout_long_v1` and is a **synthetic starting hypothesis**, not a validated win-rate model.
+
+A pattern can be defined in `config/patterns.example.json`. When a scored live/replay frame crosses the pattern thresholds, `PaperTradingHarness` opens a virtual position immediately at the observed price adjusted for slippage. It then closes on the first matching condition:
+
+- take profit
+- stop loss
+- pattern invalidation
+- maximum holding time
+- explicit/manual end-of-replay close
+
+Closed trades include round-trip fees and slippage. Per-pattern performance includes trade count, win rate, average net return, compounded return, profit factor, average MFE and average MAE.
+
+Replay usage:
+
+```bash
+PYTHONPATH=src python -m shadow_wik.paper_cli \
+  frames.jsonl config/patterns.example.json \
+  --ledger paper_trades.jsonl
+```
+
+Each frame is one JSONL object:
+
+```json
+{"symbol":"005930","timestamp":"2026-09-24T10:31:02+09:00","price":84200,"scores":{"EDGE":78,"FLOW":82,"STRUCTURE":75,"SAFETY":68,"TIMING":86},"jev_response":{"answers":{"breakout_next_window":{"noul":0.73}}}}
+```
+
+The same harness can receive frames created directly from engine analysis with `MarketFrame.from_analysis(...)`.
+
+**No broker/order API exists in this paper-trading path.** Promotion to real execution requires separate field evidence and explicit human authorization.
