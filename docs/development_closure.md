@@ -1,25 +1,26 @@
-# Development closure candidate
+# Development closure gate
 
-Status: **TECHNICAL_COMPLETION_CANDIDATE — TECHNICAL GATES PASS**
+Status: **TECHNICAL_BASELINE_PASS / FIELD_GATE_OPEN**
 
-This document prepares, but does not itself make, the final development-closure declaration for the current `intent.md`.
+The current repository has a technically stable baseline. That is no longer sufficient for final development closure.
 
-## Frozen technical scope
+## Gate chain
 
-The current technical baseline is complete when the repository can repeatedly verify these paths without live credentials:
+- M7 — technical release stability
+- M8 — real-field profitability
+- M9 — automation authority and execution safety, only when automatic operation is the intended final mode
+- M10 — final human closure declaration
 
-1. MarketSnapshot normalization and deterministic feature boundaries.
-2. Persona / regime / Jev judgment separation.
-3. Five-axis human fingerprint and sensory grammar.
-4. Experience Harness anti-overfit rule: one experience cannot auto-mutate behavior.
-5. Pattern-triggered paper entry/exit with fees, slippage, MFE/MAE and performance aggregation.
-6. Trade lifecycle with fixed entry horizon, sell-focus `hold/reduce/exit`, trade history, and success verdict provenance.
-7. Zero-install local runtime: `doctor`, full tests, `demo`, and stream plumbing.
-8. Read-only market-data adapters and paper-only live trader; no real broker order path.
+Two closure routes exist:
 
-## Closure verification
+1. **Manual-operation route:** M7 PASS + M8 PASS -> closure becomes ELIGIBLE.
+2. **Automatic-operation route:** M7 PASS + M8 PASS + M9 PASS -> closure becomes ELIGIBLE.
 
-Run from a clean checkout with Python 3.11+:
+In either route, M10 remains undeclared until a current-scope verified human decision for `D10_DECLARE_COMPLETE` exists.
+
+## M7 — technical baseline
+
+Run from a clean checkout:
 
 ```bash
 python scripts/release_check.py
@@ -28,58 +29,81 @@ python run.py test
 python run.py demo
 ```
 
-GitHub Actions repeats compile, release-check, doctor, full unit regression and demo on Python 3.11, 3.12 and 3.13.
+GitHub Actions repeats compile, release-check, doctor, full unit regression, field-gate dry execution and demo on Python 3.11, 3.12 and 3.13.
 
-## Explicitly outside the technical closure claim
+Technical PASS proves reproducibility of the software contracts only.
 
-The following gates remain **OPEN / UNVERIFIED** and are not evidence against technical completion:
+## M8 — field profitability
 
-- Real-market profitability of any pattern or fingerprint threshold.
-- Calibration of raw Jev probabilities to realized market frequencies with sufficient field samples.
-- Human perceptual validation that the visual grammar improves reaction quality in live trading.
-- Reliability of live external providers under real outages, throttling and market stress.
-- Real broker order execution.
-- Any automatic-trading authority.
+Only actual completed trades explicitly recorded as `evidence_kind=live_real` can count.
 
-Synthetic and paper-trading results must never be described as realized investment performance.
+The initial field policy requires all of:
 
-## Locked safety boundary
+- at least 30 closed real trades
+- at least 10 distinct trading days
+- positive average net return after recorded costs
+- one-sided mean > 0 with p < 0.05
+- profit factor >= 1.20
+- maximum compounded-path drawdown <= 10%
+- largest winning trade <= 50% of total positive trade returns
 
+Paper, synthetic, reconstructed or unverified trades never count. Missing cost information excludes the trade.
+
+Run:
+
+```bash
+python run.py field-gate --db .shadow/trades.db
+```
+
+Insufficient evidence returns `OPEN`; sufficient evidence that violates a criterion returns `FAIL`; all criteria passing returns `PASS`.
+
+These thresholds are the project's initial field policy, not a universal investment-success standard. They may only be changed through a new Intent/Graph revision, not after observing a failure merely to obtain PASS.
+
+## M9 — automation authority
+
+M9 cannot PASS unless M8 already PASS.
+
+If automatic execution is selected as the final operating mode, the gate additionally requires bounded pre-trade notional, position, daily-loss and order-rate limits; a symbol allowlist; stale-data rejection; erroneous and duplicate-order guards; a kill switch; paper/live separation; post-trade reconciliation; a verified execution adapter; and a current-scope verified human decision for `D9_AUTOMATION_AUTHORITY`.
+
+A JSON config alone never grants authority. The repository's example config is intentionally disabled.
+
+The current repository has no real-order adapter, therefore the present expected state is **M9 OPEN**.
+
+## Safety boundary
+
+- This Intent revision does not authorize automatic trading.
 - Actual orders and position changes remain human-reserved.
-- Kiwoom integration is market-data only.
-- Paper trading cannot promote itself to real execution.
-- One recent trade cannot rewrite model or visual behavior.
-- A short-horizon trade cannot automatically extend its horizon to avoid a loss.
+- A config file cannot substitute for a verified human authorization record.
+- Paper/synthetic results cannot promote themselves into M8.
+- A short-horizon losing trade cannot silently extend its horizon.
+- Regressions or contrary field evidence reopen the affected node.
+- M9 engineering controls are not a substitute for broker, exchange, or jurisdiction-specific legal and regulatory obligations.
 
 ## Reopen conditions
 
-Development is reopened if any of the following occurs:
+Reopen the affected node if:
 
-- A release regression fails on a supported Python version.
-- Intent changes.
-- A measured field failure contradicts a locked technical contract.
-- A live-data adapter violates freshness or source assumptions.
-- A real-order capability is proposed or introduced.
-- Repeated field evidence justifies a change to fingerprint, pattern, calibration or visual grammar.
-- The user explicitly changes the system mission or human-reserved authority.
+- supported-version regression fails;
+- Intent or field thresholds change;
+- live data violate freshness/source assumptions;
+- measured field results contradict a locked inference;
+- execution authority or order-capability scope changes;
+- repeated field evidence justifies a fingerprint, pattern, calibration or visual-grammar change.
 
-## Final declaration hold
+## Current declaration state
 
-Technical completion may be declared only after the M7 release-readiness checks pass on the repository baseline.
+The correct current state is:
 
-The final declaration is intentionally reserved for the human owner. Until that explicit decision, the correct status is:
+> **기술 baseline PASS. M8 실전 수익성은 실제 `live_real` 표본으로 검증 전이므로 OPEN. M9 자동주문 권한도 OPEN. 따라서 M10 최종 개발종료 선언은 아직 불가.**
 
-> **개발종료 후보 — 기술적 기준 PASS. 실전 성과와 자동매매 권한은 별도 검증 대상이며, 최종 개발종료 선언은 human hold `D7_DECLARE_COMPLETE`에 남아 있다.**
+## Final declaration draft — manual route
 
+When M8 is PASS and `D10_DECLARE_COMPLETE` is explicitly approved:
 
-## Final declaration draft
+> **shadow_wik의 현재 Intent에 정의된 개발을 종료한다. 기술 회귀와 실제 체결 기반 수익성 Gate가 모두 통과했으며, 이후 변경은 회귀·반증되는 field evidence·Intent 변경 또는 명시적 재개 결정이 있을 때만 REOPEN한다. 실제 주문 권한은 계속 인간에게 있다.**
 
-아래 문구는 `D7_DECLARE_COMPLETE`의 최종 인간 결정이 내려질 때 사용하는 선언 초안이다.
+## Final declaration draft — automatic route
 
-> **shadow_wik의 현재 Intent에 정의된 기술 개발 범위는 종료한다.**
->
-> M1 관측 신뢰성부터 M7 릴리스 안정성까지의 기술 계약은 정본 저장소의 자동 회귀 기준으로 고정한다. 이후 변경은 버그·회귀·Intent 변경·반복된 field evidence 또는 명시적 재개 결정이 있을 때만 REOPEN한다.
->
-> 이 선언은 실전 수익성, Jev 확률의 충분한 실현빈도 calibration, 인간 감각 향상 효과, 외부 데이터 공급자의 실전 안정성, 실제 주문 실행 또는 자동매매 권한의 검증 완료를 의미하지 않는다. 이 항목들은 별도 field gate로 계속 열린 상태다.
->
-> 실제 주문과 포지션 변경의 최종 권한은 계속 인간에게 있다.
+When M8 and M9 are PASS and `D10_DECLARE_COMPLETE` is explicitly approved:
+
+> **shadow_wik의 현재 Intent에 정의된 자동운영 개발을 종료한다. 기술 회귀, 실제 체결 기반 수익성, 자동주문 안전·권한 Gate가 모두 통과한 현재 범위를 baseline으로 고정한다. 승인된 한도 밖의 주문권한 확대는 새로운 Intent/Graph revision 없이 허용하지 않는다.**
