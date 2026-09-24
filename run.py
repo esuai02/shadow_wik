@@ -404,6 +404,76 @@ def cmd_feed_kiwoom(args: argparse.Namespace) -> int:
     return 0
 
 
+# Per-side cost assumptions (bps). KRX: 1.5 fee + half of the ~0.20 % sell tax.
+# US: conservative online commission; set --fee-bps to your actual Kiwoom rate.
+DEFAULT_COSTS = {"kr": (11.5, 5.0), "us": (10.0, 3.0)}
+
+
+def _costs(code: str, args: argparse.Namespace):
+    from shadow_wik.zones import CostModel
+
+    fee, slip = DEFAULT_COSTS["us" if ":" in code else "kr"]
+    return CostModel(fee_bps_per_side=args.fee_bps if args.fee_bps is not None else fee,
+                     slippage_bps_per_side=args.slippage_bps if args.slippage_bps is not None else slip)
+
+
+def _zone_report(client, code: str, args: argparse.Namespace, rebuild: bool) -> dict[str, Any]:
+    from shadow_wik.trader import build_report, save_json
+
+    path = STATE / f"zones_{code.replace(':', '_')}.json"
+    if path.exists() and not rebuild:
+        return json.loads(path.read_text(encoding="utf-8"))
+    bars = client.minute_bars(code, pages=args.pages)
+    report = build_report(code, bars, _costs(code, args))
+    save_json(path, report)
+    return report
+
+
+def cmd_zones(args: argparse.Namespace) -> int:
+    """Rebuild significance zones from Kiwoom minute-bar history."""
+    load_dotenv()
+    ensure_state()
+    from shadow_wik.kiwoom_feed import KiwoomFeedError, KiwoomQuoteClient
+
+    try:
+        client = KiwoomQuoteClient.from_env()
+        for code in args.codes:
+            report = _zone_report(client, code, args, rebuild=True)
+            sig = [z["name"] for z in report["zones"] if z["status"] == "significant"]
+            print(json.dumps({"symbol": code, "bars": report["bars"], "candidates": len(report["zones"]),
+                              "significant": sig}, ensure_ascii=False))
+    except KiwoomFeedError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    return 0
+
+
+def cmd_ui(args: argparse.Namespace) -> int:
+    """Local paper-trading UI; trades virtually only inside significant zones."""
+    load_dotenv()
+    ensure_state()
+    from shadow_wik.jev import JevClient
+    from shadow_wik.kiwoom_feed import KiwoomFeedError, KiwoomQuoteClient
+    from shadow_wik.notify_telegram import TelegramError, TelegramNotifier
+    from shadow_wik.webui.server import Runtime, serve
+
+    try:
+        client = KiwoomQuoteClient.from_env()
+        reports = {code: _zone_report(client, code, args, rebuild=False) for code in args.codes}
+    except KiwoomFeedError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    jev = JevClient.from_env() if os.getenv("TYPESAFE_API_KEY") else None
+    try:
+        notifier = TelegramNotifier.from_env()
+    except TelegramError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(f"telegram alerts: {'on' if notifier else 'off (TELEGRAM_CHAT_ID / token not set)'}", flush=True)
+    serve(Runtime(client, reports, STATE, args.interval, jev=jev, notifier=notifier), args.port)
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Zero-install local runner for shadow_wik")
     sub = p.add_subparsers(dest="command", required=True)
@@ -531,6 +601,21 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--count", type=int, default=0)
     sp.set_defaults(func=cmd_feed_kiwoom)
 
+    sp = sub.add_parser("zones", help="Rebuild statistically significant zones from Kiwoom minute-bar history")
+    sp.add_argument("codes", nargs="+", help="KRX code (005930) or US EXCHANGE:TICKER (ND:PLTR)")
+    sp.add_argument("--pages", type=int, default=40, help="pages of history (KRX 900 bars/page, US 100 bars/page)")
+    sp.add_argument("--fee-bps", type=float, help="per-side fee+tax bps (default KRX 11.5, US 10)")
+    sp.add_argument("--slippage-bps", type=float, help="per-side slippage bps (default KRX 5, US 3)")
+    sp.set_defaults(func=cmd_zones)
+
+    sp = sub.add_parser("ui", help="Local paper-trading UI (127.0.0.1); trades only in significant zones")
+    sp.add_argument("codes", nargs="+")
+    sp.add_argument("--port", type=int, default=8765)
+    sp.add_argument("--interval", type=float, default=60.0, help="seconds between minute-bar polls")
+    sp.add_argument("--pages", type=int, default=40, help="history pages if no saved zone report")
+    sp.add_argument("--fee-bps", type=float)
+    sp.add_argument("--slippage-bps", type=float)
+    sp.set_defaults(func=cmd_ui)
     return p
 
 

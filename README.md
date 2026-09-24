@@ -44,7 +44,32 @@ Kiwoom REST quotes (read-only, market data only) can feed `stream` directly. Set
 python run.py feed-kiwoom 005930 --interval 5 | python run.py stream --patterns config/patterns.example.json
 ```
 
-The feed only fills `symbol`, `timestamp`, `price` and metadata; snapshot score fields stay at neutral defaults until feature extraction is added.
+The feed only fills `symbol`, `timestamp`, `price` and metadata; snapshot score fields stay at neutral defaults.
+
+### Local paper-trading UI (significant zones only)
+
+```bash
+# 1) build statistically significant zones from ~4 months of 1-minute bars (40 pages x 900 bars)
+python run.py zones 005930 000660 --pages 40
+
+# 2) open http://127.0.0.1:8765 — polls minute bars every 60 s and trades virtually
+python run.py ui 005930 000660
+```
+
+- Snapshot fields that 1-minute OHLCV can observe are measured (`bar_features.py`); the rest stay neutral and are shown as Unknown.
+- A *zone* is `axis >= threshold` on one or two fingerprint axes. Each candidate is paper-traded on the older 70 % of history, tested for mean net return > 0 (Benjamini-Hochberg, q = 0.05), and must be confirmed on the newer 30 % (p < 0.05). Only confirmed zones may open virtual positions; with zero confirmed zones the symbol is observed but never traded.
+- Costs assume 1.5 bps fee + 10 bps (half of sell tax) + 5 bps slippage per side (0.33 % round trip).
+- Buttons only journal whether you followed a recommendation (`.shadow/decisions.jsonl`). No broker order path exists; real orders stay manual.
+- Jev is used automatically when `TYPESAFE_API_KEY` is set, as raw display context only: zone matching and paper trades always use Jev-free scores, because zones were tested on them.
+- Only completed bars are traded (a bar is final 60 s after its start time).
+- US symbols use `EXCHANGE:TICKER` (e.g. `ND:PLTR`), 100 bars/page, US/Eastern timestamps; default US costs are 10 bps fee + 3 bps slippage per side — pass `--fee-bps` for your actual rate.
+
+Telegram alerts fire when a symbol *enters* a significant zone (`.shadow/alerts.jsonl` logs every attempt). Configure in `.env`:
+
+```bash
+TELEGRAM_TOKEN_FILE=/path/to/env/file/with/TELEGRAM_BOT_TOKEN   # read by key only, never copied
+TELEGRAM_CHAT_ID=<your chat id>
+```
 
 `stream` expects each line to contain `price` plus either the MarketSnapshot fields directly or a nested `snapshot` object. It emits a compact JSON line containing the five-axis fingerprint, signals, and any paper-trade open/close events.
 

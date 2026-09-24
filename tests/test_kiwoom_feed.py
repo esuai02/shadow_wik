@@ -25,7 +25,7 @@ class FakeHttp:
 
     def __call__(self, url, headers, body):
         self.calls.append((url, headers, body))
-        return self.token_res if url.endswith("/oauth2/token") else self.quote
+        return (self.token_res if url.endswith("/oauth2/token") else self.quote), {}
 
 
 class KiwoomFeedTests(unittest.TestCase):
