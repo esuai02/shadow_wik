@@ -1,6 +1,6 @@
 # Development closure candidate
 
-Status: **TECHNICAL_COMPLETION_CANDIDATE**
+Status: **TECHNICAL_COMPLETION_CANDIDATE — TECHNICAL GATES PASS**
 
 This document prepares, but does not itself make, the final development-closure declaration for the current `intent.md`.
 
@@ -69,4 +69,4 @@ Technical completion may be declared only after the M7 release-readiness checks 
 
 The final declaration is intentionally reserved for the human owner. Until that explicit decision, the correct status is:
 
-> **개발종료 후보 — 기술적 기준 통과 대기/확인 중. 실전 성과와 자동매매 권한은 별도 검증 대상.**
+> **개발종료 후보 — 기술적 기준 PASS. 실전 성과와 자동매매 권한은 별도 검증 대상이며, 최종 개발종료 선언은 human hold `D7_DECLARE_COMPLETE`에 남아 있다.**
