@@ -44,7 +44,7 @@ class JevClient:
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "shadow-wik/0.1",
+                "User-Agent": "shadow-wik/0.2",
             },
         )
         try:
@@ -57,8 +57,62 @@ class JevClient:
             raise JevError(f"Jev connection error: {exc.reason}") from exc
 
 
-def build_questions() -> dict[str, Any]:
+def build_exit_questions() -> dict[str, Any]:
     return {
+        "position_continue_to_horizon": {
+            "type": "noul",
+            "instructions": "Given the supplied live market state and the precommitted trade horizon/event deadline, is continuing to hold the remaining position more favorable than fully exiting now for the rest of that horizon?",
+            "criteria": {
+                "true": "The original edge remains intact enough that holding through more of the remaining horizon is preferable to exiting now.",
+                "false": "Time pressure, event resolution, structure failure, adverse flow, news risk, or diminished upside makes exiting now preferable.",
+            },
+        },
+        "original_trade_thesis_intact": {
+            "type": "noul",
+            "instructions": "Is the original trade thesis still intact for the remaining precommitted horizon, rather than merely being defended because the position is already owned?",
+            "criteria": {
+                "true": "Current independent evidence still supports the original thesis inside the remaining horizon.",
+                "false": "The thesis is invalidated, materially weakened, expired, or mainly sustained by position ownership/recent narrative reinforcement.",
+            },
+        },
+        "exit_driver": {
+            "type": "choice",
+            "instructions": "Which single factor should dominate the current sell-side decision? Prefer unknown when evidence is mixed.",
+            "criteria": {
+                "time_window": "The precommitted holding window is ending or already expired.",
+                "target_reached": "The planned economic objective is substantially realized and remaining upside is inferior to exit risk.",
+                "thesis_invalidated": "Price/flow/regime evidence invalidates the original reason for entry.",
+                "event_resolved": "An earnings release, scheduled news, or other planned catalyst has occurred and the trade's event edge is spent.",
+                "risk_spike": "News, liquidity, crowding, or adverse flow risk has risen enough to dominate.",
+                "opportunity_cost": "The remaining edge is too weak relative to capital/time tied up in the position.",
+                "thesis_intact": "The planned thesis remains intact and the current evidence does not justify exit yet.",
+                "unknown": "No single sell driver has enough evidence to dominate.",
+            },
+        },
+        "sell_urgency": {
+            "type": "score",
+            "instructions": "Rate the urgency of reducing or exiting the position now, considering remaining horizon, event timing, live market structure, news risk, and current P/L.",
+            "criteria": [
+                "Low: horizon remains open and thesis/structure are intact.",
+                "Moderate: some deterioration or time pressure; prepare but no strong need to exit immediately.",
+                "High: material thesis/time/risk deterioration makes near-term reduction or exit important.",
+                "Extreme: the planned window is exhausted or live evidence shows severe adverse asymmetry requiring immediate human attention.",
+            ],
+        },
+        "exit_action": {
+            "type": "choice",
+            "instructions": "Concentrate the supplied trade plan, remaining time/event window, current P/L, live market evidence, personas, news risk, and uncertainty into one current position-management action. This is advisory; the human owns the final decision.",
+            "criteria": {
+                "hold": "Keep the current position size because the remaining edge and horizon still justify exposure.",
+                "reduce": "Sell part of the position because edge remains but asymmetry/time/risk no longer supports full size.",
+                "exit": "Sell the remaining position because the trade window, thesis, event edge, or risk/reward no longer justifies continued exposure.",
+            },
+        },
+    }
+
+
+def build_questions(*, include_exit: bool = False) -> dict[str, Any]:
+    questions = {
         "breakout_next_window": {
             "type": "noul",
             "instructions": "Given only the supplied market state, is a clean break above the current intraday prior high more likely to occur before a material rejection in the next observation window?",
@@ -127,4 +181,30 @@ def build_questions() -> dict[str, Any]:
                 "Extreme: the thesis is highly recent, crowded, repetitive, and weakly falsifiable.",
             ],
         },
+    }
+    if include_exit:
+        questions.update(build_exit_questions())
+    return questions
+
+
+def summarize_exit_focus(response: dict[str, Any] | None) -> dict[str, Any]:
+    if not response:
+        return {
+            "status": "unmeasured",
+            "action": None,
+            "action_probabilities": {},
+            "driver": None,
+            "sell_urgency": None,
+        }
+    answers = response.get("answers", {})
+    action = answers.get("exit_action", {})
+    driver = answers.get("exit_driver", {})
+    return {
+        "status": "measured" if action else "missing_exit_answer",
+        "action": action.get("choice"),
+        "action_probabilities": action.get("probabilities", {}),
+        "driver": driver.get("choice"),
+        "sell_urgency": answers.get("sell_urgency"),
+        "continue_probability": answers.get("position_continue_to_horizon", {}).get("noul"),
+        "thesis_intact_probability": answers.get("original_trade_thesis_intact", {}).get("noul"),
     }
