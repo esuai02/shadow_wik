@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: doctor test analyze demo paper
+.PHONY: doctor test analyze demo paper release-check
 
 doctor:
 	$(PYTHON) run.py doctor
@@ -16,3 +16,6 @@ demo:
 
 paper:
 	$(PYTHON) run.py paper examples/paper_frames.example.jsonl config/patterns.example.json
+
+release-check:
+	$(PYTHON) scripts/release_check.py
