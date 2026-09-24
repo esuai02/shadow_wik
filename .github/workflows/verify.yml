@@ -40,5 +40,8 @@ jobs:
       - name: Full unit regression
         run: python run.py test
 
+      - name: Field gate dry status
+        run: python run.py field-gate
+
       - name: Zero-install demo
         run: python run.py demo
