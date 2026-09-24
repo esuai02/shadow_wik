@@ -1,13 +1,16 @@
 flowchart TD
-  %% run=shadow-sensory-v1 revision=2 focus=M5
+  %% run=shadow-sensory-v1 revision=3 focus=M6
   M1["M1: 관측 신뢰성"]
   M2["M2: 시장 의미와 확률"]
   M3["M3: 감각 시각화 / Fingerprint"]
   M4["M4: 경험 학습 Harness"]
   M5["M5: 패턴 가상체결 검증"]
+  M6["M6: 거래 생명주기 · 매도 집중"]
   M1 -->|M1__M2| M2
   M2 -->|M2__M3| M3
   M3 -->|M3__M4| M4
   M4 -->|M4__M5| M5
-  M5 -.성과 Evidence로 재교정.-> M3
-  M5 -.실패 분류.-> M4
+  M2 -->|M2__M6| M6
+  M5 -->|M5__M6| M6
+  M6 -.매도 결과 Evidence.-> M4
+  M6 -.horizon/매도 패턴 교정.-> M3
