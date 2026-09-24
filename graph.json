@@ -2,12 +2,12 @@
   "schema_version": 1,
   "kind": "execution_graph",
   "run_id": "shadow-sensory-v1",
-  "revision": 4,
+  "revision": 5,
   "locale": "ko",
   "intent_file": "intent.md",
-  "intent_sha256": "68ac2f6da27890f7e3cb1dc29bac55491cc722dca6947fe58bc44a359b65c40c",
-  "mission": "실시간 시장 상태를 감각 신호로 바꾸고, 고정된 거래 생명주기와 가상 검증을 안정적으로 재현한 뒤 기술적 개발종료 후보를 만든다.",
-  "focus": "M7",
+  "intent_sha256": "37d462433bb080b010c9eb65d0b07d6c78c76e8d9abc5b5c09764d3d0b02730b",
+  "mission": "기술 안정성 위에 실제 체결 수익성을 검증하고, 선택한 운영형이 자동주문이면 별도 안전·권한 Gate까지 통과한 뒤에만 개발종료를 선언한다.",
+  "focus": "M8",
   "nodes": [
     {
       "id": "M1",
@@ -252,12 +252,12 @@
     },
     {
       "id": "M7",
-      "label": "릴리스 안정성·개발종료 준비",
-      "outcome": "현재 Intent의 기술 범위를 정본 저장소에서 반복 검증하고, 실전 field gate와 자동주문 권한을 분리한 상태로 개발종료 후보 baseline을 고정한다.",
+      "label": "기술 릴리스 안정성",
+      "outcome": "현재 Intent의 기술 범위를 정본 저장소에서 반복 검증해 field validation의 안정된 입력 baseline을 제공한다.",
       "depends_on": [
         "M6"
       ],
-      "review_question": "전체 회귀가 정본에서 재현되고 미검증 field gate가 종료 선언과 혼동되지 않는가?",
+      "review_question": "전체 회귀가 정본에서 재현되며 기술 PASS가 실전 수익성 PASS로 오해되지 않는가?",
       "artifacts": [
         "scripts/release_check.py",
         "tests/test_release_check.py",
@@ -266,9 +266,7 @@
       ],
       "maker": "host-maker",
       "review": "separated",
-      "human_holds": [
-        "D7_DECLARE_COMPLETE"
-      ],
+      "human_holds": [],
       "minor_limit": 0,
       "criteria": [
         {
@@ -296,9 +294,182 @@
         },
         {
           "id": "C7C",
-          "statement": "개발종료 문서는 기술 완료와 실전 수익성/확률 calibration/시각 감각/실주문 자동화의 미검증 상태를 명시적으로 분리한다.",
-          "method": "Inspect docs/development_closure.md and current Intent human-reserved decisions.",
-          "target": "TECHNICAL_COMPLETION_CANDIDATE이며 field gates OPEN/UNVERIFIED, final declaration은 human hold",
+          "statement": "기술 릴리스 PASS는 field profitability나 자동주문 권한을 대신하지 않고 M8의 입력 baseline으로만 사용된다.",
+          "method": "Inspect docs/development_closure.md, scripts/field_gate.py and current Intent.",
+          "target": "TECHNICAL_BASELINE_PASS와 FIELD_GATE_OPEN/PASS 상태가 분리됨",
+          "evidence_types": [
+            "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
+    },
+    {
+      "id": "M8",
+      "label": "실전 수익성 검증",
+      "outcome": "실제 체결로 명시된 비용 반영 거래 표본에서 우위가 반복 가능하다는 최소 field evidence를 확보한다.",
+      "depends_on": [
+        "M7"
+      ],
+      "review_question": "이 성과는 실제 체결 표본인가, paper/synthetic/unverified 표본이 섞였거나 소수의 큰 수익에 의존하는가?",
+      "focus_gap": "현재 종료의 지배적 gap. live_real 표본이 충분하지 않으면 OPEN으로 유지한다.",
+      "artifacts": [
+        "src/shadow_wik/field_validation.py",
+        "src/shadow_wik/trade_history.py",
+        "scripts/field_gate.py",
+        "tests/test_field_validation.py",
+        "docs/field_validation.md"
+      ],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [],
+      "minor_limit": 0,
+      "criteria": [
+        {
+          "id": "C8A",
+          "statement": "실전 수익성 계산에는 evidence_kind=live_real 이고 closed 상태이며 비용 정보가 보존된 실제 체결만 포함한다.",
+          "method": "python run.py field-gate --db .shadow/trades.db",
+          "target": "paper/synthetic/unverified 거래 제외, live_real 비용 반영 거래만 sample에 포함",
+          "evidence_types": [
+            "test",
+            "measurement"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C8B",
+          "statement": "초기 field policy는 최소 30거래/10거래일, 평균 net return>0, one-sided mean>0 p<0.05, profit factor>=1.20, max drawdown<=10%, 양의 총이익 중 단일 거래 기여<=50%를 동시에 요구한다.",
+          "method": "python run.py field-gate --db .shadow/trades.db",
+          "target": "모든 profitability checks PASS. 기준은 프로젝트 초기 정책이며 변경 시 명시적 Intent/Graph revision 필요",
+          "evidence_types": [
+            "measurement"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C8C",
+          "statement": "실전 표본 부족은 성공으로 보간하지 않고 OPEN으로, 충분한 표본에서 기준 위반은 FAIL로 기록한다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_field_validation.py -v",
+          "target": "insufficient=>OPEN, adverse sufficient sample=>FAIL, qualifying live_real sample=>PASS",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
+    },
+    {
+      "id": "M9",
+      "label": "자동주문 권한·안전",
+      "outcome": "자동주문 운영을 선택할 경우 실전 수익성 위에 주문 전 위험통제와 명시적 권한을 추가로 검증한다.",
+      "depends_on": [
+        "M8"
+      ],
+      "review_question": "설정파일의 boolean을 사람 승인이나 실제 안전통제의 증거로 오인하고 있지 않은가?",
+      "artifacts": [
+        "src/shadow_wik/field_validation.py",
+        "scripts/field_gate.py",
+        "config/automation_authority.example.json",
+        "tests/test_field_validation.py",
+        "evidence.jsonl"
+      ],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [
+        "D9_AUTOMATION_AUTHORITY"
+      ],
+      "minor_limit": 0,
+      "criteria": [
+        {
+          "id": "C9A",
+          "statement": "자동주문 Gate는 M8 PASS와 함께 사전 notional/position/daily-loss/order-rate 한도, symbol allowlist, stale-data reject, erroneous/duplicate-order guard, kill switch, paper/live 분리, post-trade reconciliation을 요구한다.",
+          "method": "python run.py field-gate --db .shadow/trades.db --automation-config .shadow/automation_authority.json",
+          "target": "모든 automation controls와 양의 유한 limits PASS",
+          "evidence_types": [
+            "test",
+            "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C9B",
+          "statement": "자동주문 권한은 config만으로 통과하지 않고 evidence.jsonl의 D9_AUTOMATION_AUTHORITY APPROVE / verified_host_user 결정이 현재 권한범위와 일치해야 한다.",
+          "method": "python run.py field-gate --db .shadow/trades.db --automation-config .shadow/automation_authority.json",
+          "target": "verified human authorization present; absent이면 OPEN",
+          "evidence_types": [
+            "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C9C",
+          "statement": "현재 저장소에 실주문 adapter가 없는 동안 자동주문 Gate는 PASS할 수 없고, adapter 도입은 별도 regression과 안전검증으로 이 노드를 REOPEN한다.",
+          "method": "scripts/release_check.py 및 field-gate automation readiness 검사",
+          "target": "현재는 OPEN; 향후 adapter_verified=true와 회귀 증거가 있을 때만 PASS 후보",
+          "evidence_types": [
+            "test",
+            "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
+    },
+    {
+      "id": "M10",
+      "label": "최종 개발종료 선언",
+      "outcome": "선택한 운영형의 field gate가 통과한 버전을 인간이 최종 baseline으로 선언하고 이후 변경을 REOPEN 조건으로 제한한다.",
+      "depends_on": [
+        "M8"
+      ],
+      "review_question": "수동 종료 경로(M8)인지 자동 종료 경로(M8+M9)인지 명확하며 실제 human declaration이 있는가?",
+      "artifacts": [
+        "scripts/field_gate.py",
+        "docs/development_closure.md",
+        "evidence.jsonl"
+      ],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [
+        "D10_DECLARE_COMPLETE"
+      ],
+      "minor_limit": 0,
+      "criteria": [
+        {
+          "id": "C10A",
+          "statement": "수동운영 종료 경로는 M7 기술 baseline과 M8 실전 수익성 PASS를 요구한다.",
+          "method": "python run.py field-gate --db .shadow/trades.db",
+          "target": "closure.manual_eligible=true",
+          "evidence_types": [
+            "measurement",
+            "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C10B",
+          "statement": "자동주문 운영을 종료형으로 선택하면 M9 자동주문 권한 Gate PASS가 추가로 필요하다.",
+          "method": "python run.py field-gate --db .shadow/trades.db --automation-config .shadow/automation_authority.json --mode auto",
+          "target": "closure.auto_eligible=true",
+          "evidence_types": [
+            "measurement",
+            "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C10C",
+          "statement": "최종 종료 선언은 D10_DECLARE_COMPLETE에 대한 verified_host_user APPROVE 기록으로만 확정한다.",
+          "method": "Inspect evidence.jsonl decision record bound to current field-gate result.",
+          "target": "D10_DECLARE_COMPLETE APPROVE가 없으면 eligible이어도 DECLARED가 아님",
           "evidence_types": [
             "observation"
           ],
