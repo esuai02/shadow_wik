@@ -20,5 +20,6 @@
     "kill_switch": false,
     "paper_live_separation": true,
     "post_trade_reconciliation": false
-  }
+  },
+  "execution_adapter_path": null
 }
