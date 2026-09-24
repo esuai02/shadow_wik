@@ -19,6 +19,7 @@
     "cooldown_seconds": 120,
     "jev_question": "breakout_next_window",
     "min_jev_probability": 0.65,
-    "hypothesis_status": "synthetic"
+    "hypothesis_status": "synthetic",
+    "holding_horizon": "30m"
   }
 ]
