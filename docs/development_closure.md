@@ -70,3 +70,16 @@ Technical completion may be declared only after the M7 release-readiness checks 
 The final declaration is intentionally reserved for the human owner. Until that explicit decision, the correct status is:
 
 > **개발종료 후보 — 기술적 기준 PASS. 실전 성과와 자동매매 권한은 별도 검증 대상이며, 최종 개발종료 선언은 human hold `D7_DECLARE_COMPLETE`에 남아 있다.**
+
+
+## Final declaration draft
+
+아래 문구는 `D7_DECLARE_COMPLETE`의 최종 인간 결정이 내려질 때 사용하는 선언 초안이다.
+
+> **shadow_wik의 현재 Intent에 정의된 기술 개발 범위는 종료한다.**
+>
+> M1 관측 신뢰성부터 M7 릴리스 안정성까지의 기술 계약은 정본 저장소의 자동 회귀 기준으로 고정한다. 이후 변경은 버그·회귀·Intent 변경·반복된 field evidence 또는 명시적 재개 결정이 있을 때만 REOPEN한다.
+>
+> 이 선언은 실전 수익성, Jev 확률의 충분한 실현빈도 calibration, 인간 감각 향상 효과, 외부 데이터 공급자의 실전 안정성, 실제 주문 실행 또는 자동매매 권한의 검증 완료를 의미하지 않는다. 이 항목들은 별도 field gate로 계속 열린 상태다.
+>
+> 실제 주문과 포지션 변경의 최종 권한은 계속 인간에게 있다.
