@@ -132,6 +132,18 @@ class AutomationAuthorityTests(unittest.TestCase):
         self.assertEqual(result.status, "PASS")
         self.assertTrue(all(result.checks.values()))
 
+    def test_missing_adapter_artifact_blocks_authority(self):
+        result = evaluate_automation_authority(
+            self.profit,
+            automation_config(),
+            [decision("D9_AUTOMATION_AUTHORITY")],
+            intent_sha256=INTENT,
+            graph_revision=REVISION,
+            adapter_path_exists=False,
+        )
+        self.assertEqual(result.status, "FAIL")
+        self.assertFalse(result.checks["execution_adapter_verified"])
+
     def test_stale_decision_does_not_authorize(self):
         record = decision("D9_AUTOMATION_AUTHORITY")
         record["scope"]["graph_revision"] = 4
