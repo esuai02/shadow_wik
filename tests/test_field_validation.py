@@ -172,7 +172,6 @@ class ClosureTests(unittest.TestCase):
             evidence_records=[],
             intent_sha256=INTENT,
             graph_revision=REVISION,
-            adapter_path_exists=True,
         )
         self.assertTrue(result["manual_eligible"])
         self.assertEqual(result["status"], "ELIGIBLE")
@@ -191,7 +190,6 @@ class ClosureTests(unittest.TestCase):
             evidence_records=[decision("D10_DECLARE_COMPLETE")],
             intent_sha256=INTENT,
             graph_revision=REVISION,
-            adapter_path_exists=True,
         )
         self.assertEqual(result["status"], "DECLARED")
         self.assertTrue(result["declared"])
