@@ -420,4 +420,20 @@ python run.py demo
 
 GitHub Actions runs the same release contract, compile check, full regression and zero-install demo on Python 3.11, 3.12 and 3.13.
 
-The resulting status is **technical completion only**. Real-market profitability, Jev empirical calibration, live perceptual benefit and any real-order automation remain open field gates. See `docs/development_closure.md`.
+The resulting status is **M7 technical baseline only**. Final development closure now requires M8 real-field profitability. If automatic execution is selected as the final operating mode, M9 automation authority/safety must also PASS. Run `python run.py field-gate`; see `docs/field_validation.md` and `docs/development_closure.md`.
+
+
+## Field closure gate
+
+```bash
+# informational status; OPEN is expected until real evidence is sufficient
+python run.py field-gate --db .shadow/trades.db
+
+# automatic-operation route (does not itself authorize trading)
+python run.py field-gate --mode auto \
+  --automation-config .shadow/automation_authority.json
+```
+
+Only `trade-open --evidence-kind live_real` records can contribute to M8, and closed trades must preserve their actual total costs. Paper/synthetic/unverified records are excluded.
+
+The automatic route is deliberately stronger: M8 profitability must already PASS, every execution-safety control must be evidenced, an execution adapter must be verified, and a current-scope `D9_AUTOMATION_AUTHORITY` human approval record must exist. The repository does not currently contain a real-order adapter.
