@@ -8,9 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 Side = Literal["long", "short"]
-CloseReason = Literal[
-    "take_profit", "stop_loss", "max_hold", "pattern_invalidation", "manual"
-]
+CloseReason = Literal["take_profit", "stop_loss", "max_hold", "pattern_invalidation", "manual"]
 
 
 def _parse_time(value: str) -> datetime:
@@ -34,6 +32,7 @@ class PatternRule:
     jev_question: str | None = None
     min_jev_probability: float | None = None
     hypothesis_status: str = "synthetic"
+    holding_horizon: str = "30m"
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "PatternRule":
@@ -65,14 +64,7 @@ class MarketFrame:
     jev_response: dict[str, Any] | None = None
 
     @classmethod
-    def from_analysis(
-        cls,
-        *,
-        symbol: str,
-        timestamp: str,
-        price: float,
-        analysis: dict[str, Any],
-    ) -> "MarketFrame":
+    def from_analysis(cls, *, symbol: str, timestamp: str, price: float, analysis: dict[str, Any]) -> "MarketFrame":
         fingerprint = analysis.get("fingerprint", {})
         scores = fingerprint.get("scores") if isinstance(fingerprint, dict) else None
         if not isinstance(scores, dict):
@@ -97,6 +89,7 @@ class PaperTrade:
     entry_price: float
     entry_scores: dict[str, float]
     hypothesis_status: str
+    holding_horizon: str
     exit_time: str | None = None
     exit_raw_price: float | None = None
     exit_price: float | None = None
@@ -104,6 +97,8 @@ class PaperTrade:
     close_reason: CloseReason | None = None
     gross_return_pct: float | None = None
     net_return_pct: float | None = None
+    success: bool | None = None
+    success_basis: str | None = None
     mfe_pct: float = 0.0
     mae_pct: float = 0.0
 
@@ -131,8 +126,11 @@ class PatternPerformance:
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         for key in (
-            "win_rate", "average_return_pct", "compounded_return_pct",
-            "average_mfe_pct", "average_mae_pct",
+            "win_rate",
+            "average_return_pct",
+            "compounded_return_pct",
+            "average_mfe_pct",
+            "average_mae_pct",
         ):
             data[key] = round(float(data[key]), 6)
         if data["profit_factor"] is not None:
@@ -141,13 +139,6 @@ class PatternPerformance:
 
 
 class PaperTradingHarness:
-    """Pattern-triggered virtual execution.
-
-    It never sends broker orders. Entry and exit prices include configurable
-    slippage; closed returns include round-trip fees. This makes pattern
-    evaluation prospective rather than a retrospective chart annotation.
-    """
-
     def __init__(
         self,
         rules: list[PatternRule],
@@ -174,13 +165,13 @@ class PaperTradingHarness:
     def _mark_return_pct(self, trade: PaperTrade, raw_price: float) -> float:
         if trade.side == "long":
             return (raw_price / trade.entry_price - 1.0) * 100.0
-        return (trade.entry_price / raw_price - 1.0) * 100.0
+        return (trade.entry_price - raw_price) / trade.entry_price * 100.0
 
     def _net_return_pct(self, trade: PaperTrade, exit_price: float) -> tuple[float, float]:
         if trade.side == "long":
             gross = (exit_price / trade.entry_price - 1.0) * 100.0
         else:
-            gross = (trade.entry_price / exit_price - 1.0) * 100.0
+            gross = (trade.entry_price - exit_price) / trade.entry_price * 100.0
         fee_pct = self.fee_bps_per_side * 2.0 / 100.0
         return gross, gross - fee_pct
 
@@ -189,7 +180,15 @@ class PaperTradingHarness:
             return
         self.ledger_path.parent.mkdir(parents=True, exist_ok=True)
         with self.ledger_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"kind": kind, "trade": trade.to_dict()}, ensure_ascii=False, separators=(",", ":")) + "\n")
+            f.write(
+                json.dumps(
+                    {"kind": kind, "trade": trade.to_dict()},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                + "
+"
+            )
 
     def _open(self, rule: PatternRule, frame: MarketFrame) -> PaperTrade:
         self._sequence += 1
@@ -203,6 +202,7 @@ class PaperTradingHarness:
             entry_price=self._execution_price(float(frame.price), rule.side, opening=True),
             entry_scores=dict(frame.scores),
             hypothesis_status=rule.hypothesis_status,
+            holding_horizon=rule.holding_horizon,
         )
         self.open_trades[(frame.symbol, rule.name)] = trade
         self._write_event("paper_open", trade)
@@ -219,6 +219,8 @@ class PaperTradingHarness:
         trade.close_reason = reason
         trade.gross_return_pct = gross
         trade.net_return_pct = net
+        trade.success = net > 0.0
+        trade.success_basis = "auto:net_return>0%"
         self.closed_trades.append(trade)
         self.last_close_at[key] = _parse_time(frame.timestamp)
         self._write_event("paper_close", trade)
@@ -230,7 +232,6 @@ class PaperTradingHarness:
         now = _parse_time(frame.timestamp)
         opened: list[PaperTrade] = []
         closed: list[PaperTrade] = []
-
         for rule in self.rules.values():
             key = (frame.symbol, rule.name)
             trade = self.open_trades.get(key)
@@ -251,7 +252,6 @@ class PaperTradingHarness:
                 if reason is not None:
                     closed.append(self._close(key, frame, reason))
                     continue
-
             if key in self.open_trades:
                 continue
             last_close = self.last_close_at.get(key)
@@ -259,7 +259,6 @@ class PaperTradingHarness:
                 continue
             if rule.matches(frame.scores, frame.jev_response):
                 opened.append(self._open(rule, frame))
-
         return {"opened": opened, "closed": closed}
 
     def close_all(self, frame: MarketFrame) -> list[PaperTrade]:
@@ -287,16 +286,18 @@ class PaperTradingHarness:
             gains = sum(value for value in returns if value > 0)
             losses_abs = abs(sum(value for value in returns if value < 0))
             profit_factor = None if losses_abs == 0 else gains / losses_abs
-            results.append(PatternPerformance(
-                pattern=name,
-                trades=len(trades),
-                wins=wins,
-                losses=losses,
-                win_rate=wins / len(trades),
-                average_return_pct=average,
-                compounded_return_pct=(compounded - 1.0) * 100.0,
-                profit_factor=profit_factor,
-                average_mfe_pct=sum(t.mfe_pct for t in trades) / len(trades),
-                average_mae_pct=sum(t.mae_pct for t in trades) / len(trades),
-            ))
+            results.append(
+                PatternPerformance(
+                    pattern=name,
+                    trades=len(trades),
+                    wins=wins,
+                    losses=losses,
+                    win_rate=wins / len(trades),
+                    average_return_pct=average,
+                    compounded_return_pct=(compounded - 1.0) * 100.0,
+                    profit_factor=profit_factor,
+                    average_mfe_pct=sum(t.mfe_pct for t in trades) / len(trades),
+                    average_mae_pct=sum(t.mae_pct for t in trades) / len(trades),
+                )
+            )
         return results
