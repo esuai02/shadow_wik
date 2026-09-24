@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: doctor test analyze demo paper release-check
+.PHONY: doctor test analyze demo paper release-check field-gate
 
 doctor:
 	$(PYTHON) run.py doctor
@@ -19,3 +19,6 @@ paper:
 
 release-check:
 	$(PYTHON) scripts/release_check.py
+
+field-gate:
+	$(PYTHON) run.py field-gate
