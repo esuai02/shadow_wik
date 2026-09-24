@@ -202,12 +202,17 @@ def cmd_trade_open(args: argparse.Namespace) -> int:
     )
     ledger = TradeLedger(_trade_db(args.db))
     try:
-        ledger.open_trade(plan, entry_context=_entry_context_for(args.symbol))
+        ledger.open_trade(
+            plan,
+            entry_context=_entry_context_for(args.symbol),
+            evidence_kind=args.evidence_kind,
+        )
     finally:
         ledger.close()
     payload = plan.to_dict()
     payload["deadline"] = plan.deadline().isoformat()
     payload["status"] = "open"
+    payload["evidence_kind"] = args.evidence_kind
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -298,6 +303,23 @@ def cmd_trade_history(args: argparse.Namespace) -> int:
         ledger.close()
     print(json.dumps(rows, ensure_ascii=False, indent=2))
     return 0
+
+
+def cmd_field_gate(args: argparse.Namespace) -> int:
+    ensure_state()
+    cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "field_gate.py"),
+        "--db",
+        str(args.db or _trade_db(None)),
+        "--mode",
+        args.mode,
+    ]
+    if args.automation_config:
+        cmd.extend(["--automation-config", str(args.automation_config)])
+    if args.require_eligible:
+        cmd.append("--require-eligible")
+    return run(cmd)
 
 
 def cmd_stream(args: argparse.Namespace) -> int:
@@ -528,6 +550,12 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--event-at")
     sp.add_argument("--thesis")
     sp.add_argument("--success-min-return", type=float, default=0.0)
+    sp.add_argument(
+        "--evidence-kind",
+        choices=["unverified", "live_real", "paper", "synthetic"],
+        default="unverified",
+        help="Only live_real trades can count toward the field-profitability gate",
+    )
     sp.add_argument("--db", type=Path)
     sp.set_defaults(func=cmd_trade_open)
 
@@ -574,6 +602,16 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--limit", type=int, default=50)
     sp.add_argument("--db", type=Path)
     sp.set_defaults(func=cmd_trade_history)
+
+    sp = sub.add_parser(
+        "field-gate",
+        help="Evaluate real profitability, automation authority and closure eligibility",
+    )
+    sp.add_argument("--db", type=Path)
+    sp.add_argument("--mode", choices=["manual", "auto"], default="manual")
+    sp.add_argument("--automation-config", type=Path)
+    sp.add_argument("--require-eligible", action="store_true")
+    sp.set_defaults(func=cmd_field_gate)
 
     sp = sub.add_parser(
         "stream",
