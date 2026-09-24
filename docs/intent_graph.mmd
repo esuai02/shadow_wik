@@ -1,19 +1,13 @@
-flowchart TD
-  %% run=shadow-sensory-v1 revision=4 focus=M7
-  M1["M1: 관측 신뢰성"]
-  M2["M2: 시장 의미와 확률"]
-  M3["M3: 감각 시각화 / Fingerprint"]
-  M4["M4: 경험 학습 Harness"]
-  M5["M5: 패턴 가상체결 검증"]
-  M6["M6: 거래 생명주기 · 매도 집중"]
-  M7["M7: 릴리스 안정성 · 개발종료 준비"]
-  M1 -->|M1__M2| M2
-  M2 -->|M2__M3| M3
-  M3 -->|M3__M4| M4
-  M4 -->|M4__M5| M5
-  M2 -->|M2__M6| M6
-  M5 -->|M5__M6| M6
+flowchart LR
+  %% run=shadow-sensory-v1 revision=5 focus=M8; M1-M5 omitted
+  M6["M6 거래 생명주기"]
+  M7["M7 기술 릴리스 안정성"]
+  M8["M8 실전 수익성 검증"]
+  M9["M9 자동주문 권한·안전"]
+  M10["M10 최종 개발종료 선언"]
+
   M6 -->|M6__M7| M7
-  M6 -.매도 결과 Evidence.-> M4
-  M6 -.horizon/매도 패턴 교정.-> M3
-  M7 -.field evidence가 계약을 반증하면 REOPEN.-> M4
+  M7 -->|M7__M8| M8
+  M8 -->|manual route| M10
+  M8 -->|auto prerequisite| M9
+  M9 -->|auto route| M10
