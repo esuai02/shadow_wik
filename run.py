@@ -357,6 +357,10 @@ def cmd_stream(args: argparse.Namespace) -> int:
             if trade_plan is not None:
                 payload["trade_state"] = result["trade_state"]
                 payload["exit_focus"] = result["exit_focus"]
+                (STATE / "latest_exit_analysis.json").write_text(
+                    json.dumps(result, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
             if paper is not None:
                 frame = MarketFrame.from_analysis(
                     symbol=snapshot.symbol,
