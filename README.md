@@ -405,3 +405,19 @@ Each frame is one JSONL object:
 The same harness can receive frames created directly from engine analysis with `MarketFrame.from_analysis(...)`.
 
 **No broker/order API exists in this paper-trading path.** Promotion to real execution requires separate field evidence and explicit human authorization.
+
+
+## Technical closure check
+
+The current Intent has a repository-level technical closure gate. Run this before treating a revision as a stable baseline:
+
+```bash
+python scripts/release_check.py
+python run.py doctor
+python run.py test
+python run.py demo
+```
+
+GitHub Actions runs the same release contract, compile check, full regression and zero-install demo on Python 3.11, 3.12 and 3.13.
+
+The resulting status is **technical completion only**. Real-market profitability, Jev empirical calibration, live perceptual benefit and any real-order automation remain open field gates. See `docs/development_closure.md`.
