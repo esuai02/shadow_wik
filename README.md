@@ -63,6 +63,62 @@ sh scripts/dev.sh demo
 powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 demo
 ```
 
+## Trade lifecycle and sell focus
+
+Every tracked trade is treated as **buy → hold inside a precommitted horizon → sell → outcome verdict**. The entry record must choose one of:
+
+- `30m`
+- `day`
+- `3d`
+- `1w`
+- `1m`
+- `3m`
+- `6m`
+- `event` for earnings, scheduled news, or another named catalyst
+
+For an exact session deadline, pass `--planned-exit-at`. The default `day` fallback is the end of the entry calendar date, so exchange-specific session-close timing should be explicit until a market-calendar adapter exists.
+
+Example:
+
+```bash
+# record the buy and its intended ending
+python run.py trade-open 005930 84200 \
+  --horizon 3d \
+  --thesis "prior-high breakout with persistent hidden flow" \
+  --success-min-return 0.5
+
+# event-based trade
+python run.py trade-open 005930 84200 \
+  --horizon event \
+  --event-name "earnings" \
+  --event-at "2026-10-29T08:00:00+09:00"
+
+# concentrate current state into sell-side Jev questions
+python run.py trade-analyze <TRADE_ID> 85500 --jev
+
+# attach the open trade to a live stream; every frame emits trade_state + exit_focus
+python run.py feed-kiwoom 005930 --interval 5 | \
+  python run.py stream --jev --trade-id <TRADE_ID>
+
+# after the human actually sells, close and score the trade
+python run.py trade-close <TRADE_ID> 86100 --cost-bps 12
+
+# inspect lifecycle history
+python run.py trade-history --symbol 005930
+```
+
+When a trade context is present, Jev adds sell-side questions for:
+
+1. whether holding to the remaining horizon still has value
+2. whether the original thesis is still intact
+3. the dominant exit driver
+4. sell urgency
+5. one concentrated `exit_action`: `hold`, `reduce`, or `exit`
+
+The Jev action is advisory. It never sends an order. The real trade is closed only through an explicit human action such as `trade-close`.
+
+`trade-close` records entry/exit prices and times, the original horizon/event, gross and net return, exit reason, the latest matching Jev exit analysis, and a success verdict. By default success is `net_return_pct >= success_min_net_return_pct`; `--success yes|no` preserves a manual human override separately.
+
 ## Core principles
 
 1. **Analyze positions, not identity.** The unit is `position × recent experience × market regime`, not a permanent personality label.
