@@ -217,6 +217,7 @@ def evaluate_automation_authority(
     *,
     intent_sha256: str,
     graph_revision: int,
+    adapter_path_exists: bool = False,
 ) -> GateResult:
     if profitability.status != "PASS":
         return GateResult(
@@ -236,7 +237,7 @@ def evaluate_automation_authority(
         "profitability_pass": True,
         "requested": requested,
         "mode_live_authorized": cfg.get("mode") == "live_authorized",
-        "execution_adapter_verified": bool(cfg.get("execution_adapter_verified")),
+        "execution_adapter_verified": bool(cfg.get("execution_adapter_verified")) and adapter_path_exists,
         "symbol_allowlist": bool(allowlist),
     }
     for name in REQUIRED_AUTOMATION_CONTROLS:
