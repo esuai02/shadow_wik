@@ -37,6 +37,7 @@ def automation_config():
         "requested": True,
         "mode": "live_authorized",
         "execution_adapter_verified": True,
+        "execution_adapter_path": "src/shadow_wik/execution/live_adapter.py",
         "symbol_allowlist": ["005930"],
         "limits": {
             "max_order_notional": 1000000,
@@ -114,6 +115,7 @@ class AutomationAuthorityTests(unittest.TestCase):
             [],
             intent_sha256=INTENT,
             graph_revision=REVISION,
+            adapter_path_exists=True,
         )
         self.assertEqual(result.status, "FAIL")
         self.assertFalse(result.checks["verified_human_authorization"])
@@ -125,6 +127,7 @@ class AutomationAuthorityTests(unittest.TestCase):
             [decision("D9_AUTOMATION_AUTHORITY")],
             intent_sha256=INTENT,
             graph_revision=REVISION,
+            adapter_path_exists=True,
         )
         self.assertEqual(result.status, "PASS")
         self.assertTrue(all(result.checks.values()))
@@ -138,6 +141,7 @@ class AutomationAuthorityTests(unittest.TestCase):
             [record],
             intent_sha256=INTENT,
             graph_revision=REVISION,
+            adapter_path_exists=True,
         )
         self.assertEqual(result.status, "FAIL")
 
@@ -149,6 +153,7 @@ class AutomationAuthorityTests(unittest.TestCase):
             [decision("D9_AUTOMATION_AUTHORITY")],
             intent_sha256=INTENT,
             graph_revision=REVISION,
+            adapter_path_exists=True,
         )
         self.assertEqual(result.status, "OPEN")
 
@@ -167,6 +172,7 @@ class ClosureTests(unittest.TestCase):
             evidence_records=[],
             intent_sha256=INTENT,
             graph_revision=REVISION,
+            adapter_path_exists=True,
         )
         self.assertTrue(result["manual_eligible"])
         self.assertEqual(result["status"], "ELIGIBLE")
@@ -185,6 +191,7 @@ class ClosureTests(unittest.TestCase):
             evidence_records=[decision("D10_DECLARE_COMPLETE")],
             intent_sha256=INTENT,
             graph_revision=REVISION,
+            adapter_path_exists=True,
         )
         self.assertEqual(result["status"], "DECLARED")
         self.assertTrue(result["declared"])
