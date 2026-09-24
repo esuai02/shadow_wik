@@ -69,12 +69,21 @@ def main() -> int:
     evidence = load_evidence(args.evidence)
     rows = _load_rows(args.db)
     profitability = evaluate_field_profitability(rows)
+    automation_config = _load_json(args.automation_config)
+    adapter_path = None if not automation_config else automation_config.get("execution_adapter_path")
+    adapter_exists = bool(
+        isinstance(adapter_path, str)
+        and adapter_path.strip()
+        and (ROOT / adapter_path).resolve().is_file()
+        and ROOT.resolve() in (ROOT / adapter_path).resolve().parents
+    )
     automation = evaluate_automation_authority(
         profitability,
-        _load_json(args.automation_config),
+        automation_config,
         evidence,
         intent_sha256=graph["intent_sha256"],
         graph_revision=int(graph["revision"]),
+        adapter_path_exists=adapter_exists,
     )
     closure = evaluate_closure(
         technical_pass=technical_pass,
