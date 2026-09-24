@@ -23,12 +23,23 @@ from .zones import CostModel, evaluate_zones, significant_rules
 
 RECENT_FRAMES = 120
 BAR_SECONDS = timedelta(seconds=60)
+KRX_OPEN, KRX_CLOSE = "09:00", "15:20"  # half-open: last bar used is 15:19
+
+
+def session_bars(symbol: str, bars: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """KRX codes keep only the continuous regular session (09:00-15:19 KST): the 15:20 closing
+    auction and NXT pre/after-market bars trade under different liquidity and are dropped.
+    US `EXCHANGE:TICKER` symbols are returned unchanged."""
+    if ":" in symbol:
+        return bars
+    return [b for b in bars if KRX_OPEN <= b["time"][11:16] < KRX_CLOSE]
 
 
 def frames_from_bars(symbol: str, bars: list[dict[str, Any]], engine: ShadowEngine | None = None,
                      jev: JevClient | None = None) -> list[tuple[MarketFrame, dict[str, Any]]]:
-    """One frame per bar once WINDOW bars of the same session exist."""
+    """One frame per bar once WINDOW bars of the same session exist (after the session filter)."""
     engine = engine or ShadowEngine()
+    bars = session_bars(symbol, bars)
     out: list[tuple[MarketFrame, dict[str, Any]]] = []
     previous: dict[str, float] | None = None
     session_start = 0
@@ -135,6 +146,7 @@ def build_report(symbol: str, bars: list[dict[str, Any]], costs: CostModel = Cos
     report = evaluate_zones(frames, costs)
     report["symbol"] = symbol
     report["bars"] = {"count": len(bars), "from": bars[0]["time"], "to": bars[-1]["time"]} if bars else {}
+    report["session"] = "all bars" if ":" in symbol else f"KRX regular {KRX_OPEN}-{KRX_CLOSE} (excl.)"
     return report
 
 

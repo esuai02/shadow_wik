@@ -91,6 +91,15 @@ class CompletedBarTests(unittest.TestCase):
         self.assertEqual([x["time"] for x in completed(b, now)], [x["time"] for x in b[:-1]])
 
 
+class SessionFilterTests(unittest.TestCase):
+    def test_krx_keeps_only_regular_continuous_session(self):
+        from shadow_wik.trader import session_bars
+        times = ["08:59", "09:00", "15:19", "15:20", "15:30", "16:00"]
+        b = [{"time": f"2026-09-23T{t}:00+09:00"} for t in times]
+        self.assertEqual([x["time"][11:16] for x in session_bars("005930", b)], ["09:00", "15:19"])
+        self.assertEqual(len(session_bars("ND:PLTR", b)), len(b))
+
+
 class BarFeatureTests(unittest.TestCase):
     def test_uptrend_measures_high(self):
         b = bars(WINDOW + 5)
