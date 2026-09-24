@@ -1,0 +1,24 @@
+{
+  "requested": false,
+  "mode": "disabled",
+  "execution_adapter_verified": false,
+  "symbol_allowlist": [],
+  "limits": {
+    "max_order_notional": null,
+    "max_position_notional": null,
+    "max_daily_loss": null,
+    "max_orders_per_minute": null
+  },
+  "controls": {
+    "pre_trade_notional_limit": false,
+    "position_limit": false,
+    "daily_loss_limit": false,
+    "order_rate_limit": false,
+    "stale_data_reject": false,
+    "erroneous_order_guard": false,
+    "duplicate_order_guard": false,
+    "kill_switch": false,
+    "paper_live_separation": true,
+    "post_trade_reconciliation": false
+  }
+}
