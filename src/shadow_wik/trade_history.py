@@ -20,11 +20,13 @@ CREATE TABLE IF NOT EXISTS trades (
     event_at TEXT,
     thesis TEXT NOT NULL DEFAULT '',
     success_min_net_return_pct REAL NOT NULL DEFAULT 0,
+    evidence_kind TEXT NOT NULL DEFAULT 'unverified',
     status TEXT NOT NULL DEFAULT 'open',
     exit_time TEXT,
     exit_price REAL,
     gross_return_pct REAL,
     net_return_pct REAL,
+    total_cost_bps REAL,
     success INTEGER,
     success_basis TEXT,
     exit_reason TEXT,
@@ -44,22 +46,38 @@ class TradeLedger:
         self.db = sqlite3.connect(self.path)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        self._migrate_schema()
         self.db.commit()
+
+    def _migrate_schema(self) -> None:
+        columns = {row["name"] for row in self.db.execute("PRAGMA table_info(trades)").fetchall()}
+        if "evidence_kind" not in columns:
+            self.db.execute("ALTER TABLE trades ADD COLUMN evidence_kind TEXT NOT NULL DEFAULT 'unverified'")
+        if "total_cost_bps" not in columns:
+            self.db.execute("ALTER TABLE trades ADD COLUMN total_cost_bps REAL")
 
     def close(self) -> None:
         self.db.close()
 
-    def open_trade(self, plan: TradePlan, *, entry_context: dict[str, Any] | None = None) -> None:
+    def open_trade(
+        self,
+        plan: TradePlan,
+        *,
+        entry_context: dict[str, Any] | None = None,
+        evidence_kind: str = "unverified",
+    ) -> None:
+        if evidence_kind not in {"unverified", "live_real", "paper", "synthetic"}:
+            raise ValueError(f"unsupported evidence_kind: {evidence_kind}")
         self.db.execute(
             """INSERT INTO trades (
                 trade_id, symbol, entry_time, entry_price, horizon_kind,
                 planned_exit_at, event_name, event_at, thesis,
-                success_min_net_return_pct, entry_context_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                success_min_net_return_pct, evidence_kind, entry_context_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 plan.trade_id, plan.symbol, plan.entry_time, plan.entry_price,
                 plan.horizon_kind, plan.planned_exit_at, plan.event_name, plan.event_at,
-                plan.thesis, plan.success_min_net_return_pct,
+                plan.thesis, plan.success_min_net_return_pct, evidence_kind,
                 json.dumps(entry_context or {}, ensure_ascii=False, separators=(",", ":")),
             ),
         )
@@ -113,11 +131,11 @@ class TradeLedger:
             basis = "manual_override"
         self.db.execute(
             """UPDATE trades SET
-                status='closed', exit_time=?, exit_price=?, gross_return_pct=?, net_return_pct=?,
+                status='closed', exit_time=?, exit_price=?, gross_return_pct=?, net_return_pct=?, total_cost_bps=?,
                 success=?, success_basis=?, exit_reason=?, final_exit_action=?, exit_context_json=?,
                 jev_exit_json=?, note=? WHERE trade_id=?""",
             (
-                exit_time, float(exit_price), gross, net, int(success), basis, exit_reason,
+                exit_time, float(exit_price), gross, net, float(total_cost_bps), int(success), basis, exit_reason,
                 final_exit_action,
                 json.dumps(exit_context or {}, ensure_ascii=False, separators=(",", ":")),
                 json.dumps(jev_exit or {}, ensure_ascii=False, separators=(",", ":")),
