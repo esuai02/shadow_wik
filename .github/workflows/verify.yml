@@ -31,6 +31,9 @@ jobs:
       - name: Compile
         run: python -m compileall -q run.py src tests
 
+      - name: Release contract
+        run: python scripts/release_check.py
+
       - name: Doctor
         run: python run.py doctor
 
