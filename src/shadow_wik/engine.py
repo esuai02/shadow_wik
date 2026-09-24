@@ -5,10 +5,11 @@ from typing import Any
 
 from .features import compute_features
 from .fingerprint import build_breakout_long_fingerprint
-from .jev import JevClient, build_questions
+from .jev import JevClient, build_questions, summarize_exit_focus
 from .models import MarketSnapshot
 from .personas import infer_market_persona_clusters, infer_position_personas
 from .signals import build_signals
+from .trade_lifecycle import TradePlan, build_trade_state
 from .visual_grammar import build_visual_state
 
 
@@ -18,12 +19,21 @@ class ShadowEngine:
         snapshot: MarketSnapshot,
         jev: JevClient | None = None,
         previous_features: dict[str, float] | None = None,
+        trade_plan: TradePlan | None = None,
+        current_price: float | None = None,
     ) -> dict[str, Any]:
         s = snapshot.normalized()
         features = compute_features(s)
         market_personas = infer_market_persona_clusters(s, features)
         position_personas = infer_position_personas(s, features)
 
+        trade_state = None
+        if trade_plan is not None:
+            if current_price is None:
+                raise ValueError("current_price is required when trade_plan is supplied")
+            trade_state = build_trade_state(trade_plan, now=s.timestamp, current_price=current_price)
+
+        questions = build_questions(include_exit=trade_plan is not None)
         jev_state = {
             "symbol": s.symbol,
             "timestamp": s.timestamp,
@@ -60,19 +70,24 @@ class ShadowEngine:
                 "causality": "Treat correlations as causal hypotheses only when time order, mechanism, and falsification conditions are present.",
                 "unknown_catalyst": "Unknown means cause not observed, not cause absent.",
                 "probability": "Jev outputs are raw model probabilities until calibrated on realized market outcomes.",
+                "exit_horizon": "When a trade lifecycle is supplied, judge hold/reduce/exit inside the precommitted time or event horizon; do not silently convert a short trade into a longer investment thesis.",
+                "final_authority": "Jev exit_action is advisory. The human owns the final sell decision.",
             },
         }
+        if trade_state is not None:
+            jev_state["trade_lifecycle"] = trade_state
 
         result: dict[str, Any] = {
             "snapshot": s.to_dict(),
             "features": features.to_dict(),
             "position_personas": [p.to_dict() for p in position_personas],
             "market_personas": [p.to_dict() for p in market_personas],
-            "jev_request": {"state": jev_state, "questions": build_questions()},
+            "trade_state": trade_state,
+            "jev_request": {"state": jev_state, "questions": questions},
             "jev": None,
         }
         if jev is not None:
-            result["jev"] = jev.evaluate(jev_state, build_questions())
+            result["jev"] = jev.evaluate(jev_state, questions)
 
         fingerprint = build_breakout_long_fingerprint(result["features"], result["jev"])
         result["fingerprint"] = {
@@ -89,4 +104,11 @@ class ShadowEngine:
         result["signals"] = [
             x.to_dict() for x in build_signals(result["features"], result["jev"])
         ]
+        if trade_state is not None:
+            result["exit_focus"] = summarize_exit_focus(result["jev"])
+            result["exit_focus"]["phase"] = trade_state["phase"]
+            result["exit_focus"]["deadline"] = trade_state["clock"]["deadline"]
+            result["exit_focus"]["remaining_seconds"] = trade_state["clock"]["remaining_seconds"]
+            result["exit_focus"]["gross_pnl_pct"] = trade_state["gross_pnl_pct"]
+            result["exit_focus"]["decision_owner"] = "human"
         return result
