@@ -38,6 +38,14 @@ your_feed | python run.py stream --patterns config/patterns.example.json
 your_feed | python run.py stream --jev --patterns config/patterns.example.json
 ```
 
+Kiwoom REST quotes (read-only, market data only) can feed `stream` directly. Set `KIWOOM_APP_KEY`, `KIWOOM_SECRET_KEY` and `KIWOOM_PAPER` (`false` = real host) in `.env`, and register this machine's public IP in the Kiwoom OpenAPI portal:
+
+```bash
+python run.py feed-kiwoom 005930 --interval 5 | python run.py stream --patterns config/patterns.example.json
+```
+
+The feed only fills `symbol`, `timestamp`, `price` and metadata; snapshot score fields stay at neutral defaults until feature extraction is added.
+
 `stream` expects each line to contain `price` plus either the MarketSnapshot fields directly or a nested `snapshot` object. It emits a compact JSON line containing the five-axis fingerprint, signals, and any paper-trade open/close events.
 
 Runtime state is kept under `.shadow/` and ignored by Git. This is the intended local handoff point for a future browser/chart capture process or broker market-data websocket. It does **not** send real orders.

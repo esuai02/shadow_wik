@@ -200,6 +200,27 @@ def cmd_stream(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_feed_kiwoom(args: argparse.Namespace) -> int:
+    """Emit read-only Kiwoom quotes as `stream` input lines on stdout."""
+    load_dotenv()
+    from shadow_wik.kiwoom_feed import KiwoomFeedError, KiwoomQuoteClient, run_feed
+
+    try:
+        run_feed(
+            KiwoomQuoteClient.from_env(),
+            args.codes,
+            interval=args.interval,
+            count=args.count,
+            emit=lambda line: print(line, flush=True),
+        )
+    except KiwoomFeedError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Zero-install local runner for shadow_wik")
     sub = p.add_subparsers(dest="command", required=True)
@@ -234,6 +255,12 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--slippage-bps", type=float, default=2.0)
     sp.add_argument("--strict", action="store_true")
     sp.set_defaults(func=cmd_stream)
+
+    sp = sub.add_parser("feed-kiwoom", help="Poll read-only Kiwoom quotes as stream input (pipe into `stream`)")
+    sp.add_argument("codes", nargs="+", help="KRX stock codes, e.g. 005930")
+    sp.add_argument("--interval", type=float, default=5.0, help="seconds between polls")
+    sp.add_argument("--count", type=int, default=0, help="polls per code; 0 = until Ctrl+C")
+    sp.set_defaults(func=cmd_feed_kiwoom)
     return p
 
 
