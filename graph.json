@@ -2,12 +2,12 @@
   "schema_version": 1,
   "kind": "execution_graph",
   "run_id": "shadow-sensory-v1",
-  "revision": 2,
+  "revision": 3,
   "locale": "ko",
   "intent_file": "intent.md",
-  "intent_sha256": "7635e62e99a9fa74efbc2fd253f805329f3594bdaa318c46e7b8894a06ceb760",
-  "mission": "실시간 시장 상태를 감각 신호로 바꾸고 특정 패턴을 가상 체결하여 실현 수익성으로 교정한다.",
-  "focus": "M5",
+  "intent_sha256": "68ac2f6da27890f7e3cb1dc29bac55491cc722dca6947fe58bc44a359b65c40c",
+  "mission": "실시간 시장 상태를 감각 신호로 바꾸고, 매수 때 고정한 종료범위 안에서 매도 판단과 결과학습을 완결한다.",
+  "focus": "M6",
   "nodes": [
     {
       "id": "M1",
@@ -15,91 +15,132 @@
       "outcome": "MarketSnapshot 입력이 범위·시점·출처 정합성을 지킨다.",
       "depends_on": [],
       "review_question": "실시간 입력이 오래된 화면이나 다른 시점 API 값과 섞일 위험이 남아 있는가?",
-      "artifacts": ["src/shadow_wik/models.py", "src/shadow_wik/features.py"],
+      "artifacts": [
+        "src/shadow_wik/models.py",
+        "src/shadow_wik/features.py"
+      ],
       "maker": "host-maker",
       "review": "separated",
       "human_holds": [],
       "minor_limit": 0,
-      "criteria": [{
-        "id": "C1",
-        "statement": "객관 관측값은 정규화되고 측정/추론 경계를 유지한다.",
-        "method": "PYTHONPATH=src python -m unittest discover -s tests -v",
-        "target": "관련 단위 테스트 실패 0",
-        "evidence_types": ["test"],
-        "benchmark_required": false,
-        "benchmark_ids": []
-      }]
+      "criteria": [
+        {
+          "id": "C1",
+          "statement": "객관 관측값은 정규화되고 측정/추론 경계를 유지한다.",
+          "method": "PYTHONPATH=src python -m unittest discover -s tests -v",
+          "target": "관련 단위 테스트 실패 0",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
     },
     {
       "id": "M2",
       "label": "시장 의미와 확률",
       "outcome": "Persona·Regime·Catalyst·Jev가 compact state에서 분리되어 판단된다.",
-      "depends_on": ["M1"],
+      "depends_on": [
+        "M1"
+      ],
       "review_question": "Jev raw probability가 실제 승률처럼 오해될 여지가 남아 있는가?",
-      "artifacts": ["src/shadow_wik/engine.py", "src/shadow_wik/jev.py", "src/shadow_wik/signals.py"],
+      "artifacts": [
+        "src/shadow_wik/engine.py",
+        "src/shadow_wik/jev.py",
+        "src/shadow_wik/signals.py"
+      ],
       "maker": "host-maker",
       "review": "separated",
       "human_holds": [],
       "minor_limit": 0,
-      "criteria": [{
-        "id": "C2",
-        "statement": "Jev는 측정 계층이 아니라 판단 계층이며 raw probability와 calibration이 분리된다.",
-        "method": "PYTHONPATH=src python -m unittest discover -s tests -v",
-        "target": "계약 테스트 실패 0",
-        "evidence_types": ["test"],
-        "benchmark_required": false,
-        "benchmark_ids": []
-      }]
+      "criteria": [
+        {
+          "id": "C2",
+          "statement": "Jev는 측정 계층이 아니라 판단 계층이며 raw probability와 calibration이 분리된다.",
+          "method": "PYTHONPATH=src python -m unittest discover -s tests -v",
+          "target": "계약 테스트 실패 0",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
     },
     {
       "id": "M3",
       "label": "감각 시각화",
       "outcome": "숫자를 읽지 않아도 시장의 압력·속도·안정성·불확실성을 일관되게 느낄 수 있는 상태값을 만든다.",
-      "depends_on": ["M2"],
+      "depends_on": [
+        "M2"
+      ],
       "review_question": "실측/추론/모델확률/Unknown을 시각적으로 혼동시키는 표현이 있는가?",
-      "artifacts": ["src/shadow_wik/visual_grammar.py", "src/shadow_wik/fingerprint.py"],
+      "artifacts": [
+        "src/shadow_wik/visual_grammar.py",
+        "src/shadow_wik/fingerprint.py"
+      ],
       "maker": "host-maker",
       "review": "separated",
       "human_holds": [],
       "minor_limit": 0,
-      "criteria": [{
-        "id": "C3",
-        "statement": "사람이 보는 핵심 패턴 축은 0~100이며 모두 높을수록 좋은 방향으로 정규화된다.",
-        "method": "PYTHONPATH=src python -m unittest tests/test_fingerprint.py tests/test_visual_grammar.py -v",
-        "target": "시각문법/fingerprint 테스트 실패 0",
-        "evidence_types": ["test"],
-        "benchmark_required": false,
-        "benchmark_ids": []
-      }]
+      "criteria": [
+        {
+          "id": "C3",
+          "statement": "사람이 보는 핵심 패턴 축은 0~100이며 모두 높을수록 좋은 방향으로 정규화된다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_fingerprint.py tests/test_visual_grammar.py -v",
+          "target": "시각문법/fingerprint 테스트 실패 0",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
     },
     {
       "id": "M4",
       "label": "경험 학습 Harness",
       "outcome": "거래 경험을 Evidence로 축적하고 반복된 동일 오류만 수정 후보로 승격한다.",
-      "depends_on": ["M3"],
+      "depends_on": [
+        "M3"
+      ],
       "review_question": "이 수정 후보는 반복된 Evidence인가, 최근 한 번의 경험에 대한 과잉반응인가?",
-      "artifacts": ["src/shadow_wik/experience_harness.py", "evidence.jsonl"],
+      "artifacts": [
+        "src/shadow_wik/experience_harness.py",
+        "evidence.jsonl"
+      ],
       "maker": "host-maker",
       "review": "separated",
       "human_holds": [],
       "minor_limit": 0,
-      "criteria": [{
-        "id": "C4",
-        "statement": "단일 경험은 자동 수정하지 않고, 반복된 동일 이슈만 candidate-only 제안을 만든다.",
-        "method": "PYTHONPATH=src python -m unittest tests/test_experience_harness.py -v",
-        "target": "Harness 테스트 실패 0 및 auto_apply=false",
-        "evidence_types": ["test"],
-        "benchmark_required": false,
-        "benchmark_ids": []
-      }]
+      "criteria": [
+        {
+          "id": "C4",
+          "statement": "단일 경험은 자동 수정하지 않고, 반복된 동일 이슈만 candidate-only 제안을 만든다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_experience_harness.py -v",
+          "target": "Harness 테스트 실패 0 및 auto_apply=false",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
     },
     {
       "id": "M5",
       "label": "패턴 가상체결 검증",
       "outcome": "특정 패턴이 발생한 순간 가상 진입하고 이후 가격으로 비용 포함 수익률을 계산해 패턴별 실현 성과를 축적한다.",
-      "depends_on": ["M4"],
+      "depends_on": [
+        "M4"
+      ],
       "review_question": "현재 패턴의 성과는 실제로 전향적으로 기록된 것인가, 아니면 사후 차트선택의 결과인가?",
-      "artifacts": ["src/shadow_wik/paper_trading.py", "src/shadow_wik/paper_cli.py", "config/patterns.example.json"],
+      "artifacts": [
+        "src/shadow_wik/paper_trading.py",
+        "src/shadow_wik/paper_cli.py",
+        "config/patterns.example.json"
+      ],
       "maker": "host-maker",
       "review": "separated",
       "human_holds": [],
@@ -110,7 +151,9 @@
           "statement": "패턴 임계값 성립 시점에만 가상 포지션이 열리고 TP/SL/시간/패턴붕괴 규칙으로 닫힌다.",
           "method": "PYTHONPATH=src python -m unittest tests/test_paper_trading.py -v",
           "target": "가상체결 상태전이 테스트 실패 0",
-          "evidence_types": ["test"],
+          "evidence_types": [
+            "test"
+          ],
           "benchmark_required": false,
           "benchmark_ids": []
         },
@@ -119,7 +162,9 @@
           "statement": "가상 성과는 수수료·슬리피지를 반영하고 패턴별 수익률/승률/profit factor/MFE/MAE를 계산한다.",
           "method": "PYTHONPATH=src python -m unittest tests/test_paper_trading.py -v",
           "target": "비용/성과집계 테스트 실패 0",
-          "evidence_types": ["test"],
+          "evidence_types": [
+            "test"
+          ],
           "benchmark_required": false,
           "benchmark_ids": []
         },
@@ -128,7 +173,78 @@
           "statement": "예시 패턴은 SYNTHETIC 가설로 표시되고 어떤 코드 경로도 브로커 주문을 전송하지 않는다.",
           "method": "Inspect PatternRule hypothesis_status and PaperTradingHarness public methods; run unit tests.",
           "target": "hypothesis_status=synthetic 및 broker/order API 없음",
-          "evidence_types": ["test", "observation"],
+          "evidence_types": [
+            "test",
+            "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        }
+      ]
+    },
+    {
+      "id": "M6",
+      "label": "거래 생명주기·매도 집중",
+      "outcome": "매수 시 종료범위를 고정하고, 실시간 매도 국면의 모든 정보를 Jev의 hold/reduce/exit 선택으로 집중한 뒤 매도 결과와 성공판정을 거래 이력에 남긴다.",
+      "depends_on": [
+        "M2",
+        "M5"
+      ],
+      "review_question": "원래 종료범위가 손실 회피 때문에 임의로 늘어나거나, 매도 판단이 정보 나열로 다시 흩어지는가?",
+      "artifacts": [
+        "src/shadow_wik/trade_lifecycle.py",
+        "src/shadow_wik/trade_history.py",
+        "src/shadow_wik/jev.py",
+        "src/shadow_wik/engine.py",
+        "run.py"
+      ],
+      "maker": "host-maker",
+      "review": "separated",
+      "human_holds": [],
+      "minor_limit": 0,
+      "criteria": [
+        {
+          "id": "C6A",
+          "statement": "진입 시 30m/day/3d/1w/1m/3m/6m/event 종료범위를 기록하고 event horizon은 이벤트 이름과 시각을 요구한다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_trade_lifecycle.py tests/test_trade_history.py -v",
+          "target": "horizon/이벤트/거래이력 테스트 실패 0",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C6B",
+          "statement": "open trade가 주어지면 Jev는 원래 horizon 안에서 thesis 유지/보유가치/매도원인/긴급도를 계산하고 최종 exit_action을 hold/reduce/exit로 반환한다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_jev_exit.py tests/test_engine_exit.py -v",
+          "target": "sell-side Jev 계약 테스트 실패 0 및 final decision owner=human",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C6C",
+          "statement": "매도 기록 후 gross/net return, success, success_basis, exit reason, Jev exit context를 같은 거래 레코드에 보존하고 수동 성공판정 override를 구분한다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_trade_history.py tests/test_trade_cli.py -v",
+          "target": "close/success history 테스트 실패 0",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C6D",
+          "statement": "실시간 stream은 --trade-id가 있을 때 trade_state와 exit_focus를 출력하지만 실제 주문을 전송하지 않는다.",
+          "method": "Inspect run.py stream path and run local runtime tests.",
+          "target": "trade_state/exit_focus 출력 경로 존재 및 broker order API 없음",
+          "evidence_types": [
+            "test",
+            "observation"
+          ],
           "benchmark_required": false,
           "benchmark_ids": []
         }
