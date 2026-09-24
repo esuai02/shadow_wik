@@ -186,8 +186,7 @@ class PaperTradingHarness:
                     ensure_ascii=False,
                     separators=(",", ":"),
                 )
-                + "
-"
+                + "\n"
             )
 
     def _open(self, rule: PatternRule, frame: MarketFrame) -> PaperTrade:
