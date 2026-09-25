@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from shadow_wik.bar_features import WINDOW  # noqa: E402
 from shadow_wik.engine import ShadowEngine  # noqa: E402
-from shadow_wik.trader import LiveTrader, in_opening_hour, snapshot_from_bars  # noqa: E402
+from shadow_wik.trader import LiveTrader, frames_from_bars, in_opening_hour, snapshot_from_bars  # noqa: E402
 
 REPORT = {"zones": [], "costs": {"fee_bps_per_side": 1.5, "slippage_bps_per_side": 2.0},
           "exits": {"take_profit_pct": 0.6, "stop_loss_pct": 0.4, "max_hold_seconds": 900, "cooldown_seconds": 60}}
@@ -75,6 +75,12 @@ class JevAdvisoryTests(unittest.TestCase):
         self.assertTrue(triggers)
         self.assertTrue(all(e["jev_trigger"] == "opening_hour" for e in triggers))
         self.assertGreaterEqual(len(jev.calls), 3)
+
+    def test_opening_partial_frames_start_after_three_completed_bars(self):
+        bars = rising_bars(5)
+        frames = frames_from_bars("005930", bars, opening_partial=True)
+        self.assertEqual(len(frames), 3)
+        self.assertTrue(all(a["snapshot"]["metadata"].get("partial_opening") for _, a in frames))
 
     def test_opening_hour_boundary(self):
         self.assertTrue(in_opening_hour("005930", "2026-09-23T09:59:00+09:00"))
