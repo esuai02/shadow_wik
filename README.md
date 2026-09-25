@@ -437,3 +437,25 @@ python run.py field-gate --mode auto \
 Only `trade-open --evidence-kind live_real` records can contribute to M8, and closed trades must preserve their actual total costs. Paper/synthetic/unverified records are excluded.
 
 The automatic route is deliberately stronger: M8 profitability must already PASS, every execution-safety control must be evidenced, an execution adapter must be verified, and a current-scope `D9_AUTOMATION_AUTHORITY` human approval record must exist. The repository does not currently contain a real-order adapter.
+
+
+## Jev scalping paper mode
+
+With `TYPESAFE_API_KEY` configured, the local dashboard uses four scalp hypotheses:
+opening-range breakout, intraday momentum, order-flow persistence, and opening-shock reversal.
+
+```bash
+python run.py ui 005930
+```
+
+The dashboard starts with **validation strength 0/100** to collect exploratory paper samples frequently. This does not mean statistical significance. Raising the slider increases the minimum Jev pattern probability and requires stronger accumulated paper evidence before a pattern can open a new virtual position.
+
+Paper capital defaults:
+
+- seed: KRW 100,000,000
+- allocation: KRW 10,000,000 per opened pattern
+- maximum concurrent positions: 10
+- leverage: none
+- actual broker orders: none
+
+The same `M8 live_real` field gate remains unchanged; exploratory paper trades cannot satisfy it. See `docs/scalping_pattern_library.md`.
