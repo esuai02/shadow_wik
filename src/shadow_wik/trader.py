@@ -29,7 +29,15 @@ RECENT_FRAMES = 120
 BAR_SECONDS = timedelta(seconds=60)
 PAPER_MODES = ("statistical_zone", "jev_scalp")
 JEV_COOLDOWN = timedelta(minutes=10)
-KRX_OPEN, KRX_CLOSE = "09:00", "15:20"  # half-open: last bar used is 15:19
+KRX_OPEN, KRX_OPENING_HOUR_END, KRX_CLOSE = "09:00", "10:00", "15:20"  # opening focus is 09:00-09:59
+
+
+def in_opening_hour(symbol: str, timestamp: str) -> bool:
+    """The project's primary decision window: KRX 09:00-09:59 KST.
+
+    US symbols are excluded until a separate market-open contract is explicitly defined.
+    """
+    return ":" not in symbol and KRX_OPEN <= timestamp[11:16] < KRX_OPENING_HOUR_END
 
 
 def session_bars(symbol: str, bars: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -117,6 +125,9 @@ class LiveTrader:
         now = datetime.fromisoformat(frame.timestamp)
         if self.last_jev_at is not None and now - self.last_jev_at < JEV_COOLDOWN:
             return None
+        if in_opening_hour(self.symbol, frame.timestamp):
+            self.last_jev_at = now
+            return "opening_hour"
         signals = [x["code"] for x in analysis["signals"] if x["code"] != "NO_EDGE"]
         reason = "significant_zone" if zone["significant"] else ("signal:" + ",".join(signals) if signals else None)
         if reason is not None:
@@ -191,6 +202,7 @@ class LiveTrader:
                 continue
             jev_view = None
             scalp_probabilities: dict[str, float] = {}
+            opening_hour = None
             zone = zone_status(frame.scores, self.report)
             jev_trigger = None if warmup or self.jev is None else self._jev_trigger(frame, analysis, zone)
             if jev_trigger is not None:
@@ -199,9 +211,11 @@ class LiveTrader:
                         MarketSnapshot.from_dict(analysis["snapshot"]),
                         jev=self.jev,
                         include_scalp_patterns=self.paper_mode == "jev_scalp",
+                        include_opening_hour=in_opening_hour(self.symbol, frame.timestamp),
                     )
                     jev_view = live_analysis.get("jev")
                     scalp_probabilities = live_analysis.get("scalp_patterns", {})
+                    opening_hour = live_analysis.get("opening_hour")
                     self._log_jev(frame, analysis, jev_view)
                 except Exception as exc:  # Jev is advisory; a failed call must not fabricate a pattern
                     jev_view = {"error": f"{type(exc).__name__}: {exc}"}
@@ -246,6 +260,7 @@ class LiveTrader:
                     "pattern_entered": bool(result["opened"]),
                     "jev": jev_view,
                     "jev_trigger": jev_trigger,
+                    "opening_hour": opening_hour,
                     "unmeasured": analysis["snapshot"]["metadata"].get("unmeasured", []),
                     "opened": [t.to_dict() for t in result["opened"]],
                     "closed": [t.to_dict() for t in result["closed"]],
