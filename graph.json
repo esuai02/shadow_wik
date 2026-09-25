@@ -5,7 +5,7 @@
   "revision": 6,
   "locale": "ko",
   "intent_file": "intent.md",
-  "intent_sha256": "3aadf2dfcc6746e37d077db209d97f83e4377b35ffe36fd1ad6c3f1c4697a304",
+  "intent_sha256": "d6c05518213ebae22c934c288d3ed077c1fe98944f74e0198f96636c016bc721",
   "mission": "공개 근거의 단타 패턴을 Jev가 실시간 판별하고 1억원 무레버리지 paper 포트폴리오에서 탐색·검증한 뒤 실제 체결 수익성 M8로 승격한다.",
   "focus": "M5",
   "nodes": [
