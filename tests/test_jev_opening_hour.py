@@ -1,6 +1,6 @@
 import unittest
 
-from shadow_wik.jev import build_questions, summarize_opening_hour_focus
+from shadow_wik.jev import PRIMITIVE_MECHANISMS, build_questions, summarize_opening_hour_focus, summarize_primitive_mechanisms
 
 
 class OpeningHourJevTests(unittest.TestCase):
@@ -12,6 +12,21 @@ class OpeningHourJevTests(unittest.TestCase):
         self.assertIn("fomo_risk", q)
         self.assertIn("falling_knife_risk", q)
         self.assertIn("objectivity_risk", q)
+
+    def test_seven_primitive_mechanisms_are_probabilities(self):
+        q = build_questions(include_opening_hour=True)
+        self.assertEqual(len(PRIMITIVE_MECHANISMS), 7)
+        for key in PRIMITIVE_MECHANISMS:
+            self.assertEqual(q[f"mechanism_{key}"]["type"], "noul")
+
+        response = {"answers": {
+            f"mechanism_{key}": {"type": "noul", "noul": (i + 1) / 10}
+            for i, key in enumerate(PRIMITIVE_MECHANISMS)
+        }}
+        out = summarize_primitive_mechanisms(response)
+        self.assertEqual(set(out), set(PRIMITIVE_MECHANISMS))
+        self.assertAlmostEqual(out["trend_continuation"]["probability"], 0.1)
+        self.assertAlmostEqual(out["liquidity_imbalance"]["probability"], 0.7)
 
     def test_summary_preserves_current_state(self):
         response = {"answers": {
