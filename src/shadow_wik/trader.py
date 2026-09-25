@@ -37,7 +37,7 @@ def in_opening_hour(symbol: str, timestamp: str) -> bool:
 
     US symbols are excluded until a separate market-open contract is explicitly defined.
     """
-    return ":" not in symbol and KRX_OPEN <= timestamp[11:16] < KRX_OPENING_HOUR_END
+    return len(symbol) == 6 and symbol.isdigit() and KRX_OPEN <= timestamp[11:16] < KRX_OPENING_HOUR_END
 
 
 def session_bars(symbol: str, bars: list[dict[str, Any]]) -> list[dict[str, Any]]:
