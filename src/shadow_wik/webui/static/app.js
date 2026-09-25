@@ -96,6 +96,51 @@ function patternView(patterns) {
       el("span", { class: "small" }, p.eligible ? "진입 가능" : (p.recognized ? "history gate 대기" : "미인식")))));
 }
 
+function riskValue(answer) {
+  if (answer === null || answer === undefined) return "-";
+  if (typeof answer === "number") return fmt(answer, 1);
+  if (typeof answer === "object") {
+    if (typeof answer.score === "number") return fmt(answer.score, 1);
+    if (typeof answer.value === "number") return fmt(answer.value, 1);
+    if (typeof answer.choice === "string") return answer.choice;
+  }
+  return String(answer);
+}
+
+function openingHourView(latest) {
+  if (!latest) return null;
+  const o = latest.opening_hour;
+  const hm = (latest.timestamp || "").slice(11, 16);
+  const active = hm >= "09:00" && hm < "10:00";
+  if (!active) {
+    return el("section", { class: "opening-card quiet" },
+      el("strong", {}, "오늘의 60분 창 종료"),
+      el("p", { class: "small" }, "09:00~09:59 판단이 끝났습니다. 장기 포지션은 이 화면의 단기 판단과 분리합니다."));
+  }
+  if (!o || o.status !== "measured") {
+    return el("section", { class: "opening-card" },
+      el("strong", {}, "오프닝 60분 · Jev 재평가 대기"),
+      el("p", { class: "small" }, "다음 평가까지 신규 행동을 서두르지 않습니다. 놓친 상승은 손실이 아닙니다."));
+  }
+  const stance = o.stance === "buy_state" ? "매수 상태" : "매도 상태";
+  const action = o.stance === "buy_state"
+    ? ({hold:"보유", reduce:"축소", exit:"매도"}[o.buy_action] || o.buy_action || "-")
+    : ({enter:"진입", wait:"대기", observe_today:"오늘 관망"}[o.sell_action] || o.sell_action || "-");
+  const flow = ({uptrend:"상승 흐름", downtrend:"하락 흐름", range:"횡보", unstable:"불안정"}[o.flow] || o.flow || "-");
+  return el("section", { class: `opening-card ${o.stance === "buy_state" ? "buy" : "sell"}` },
+    el("div", { class: "opening-head" },
+      el("div", {}, el("span", { class: "small" }, "Jev 현재 상태"), el("strong", { class: "opening-stance" }, stance)),
+      el("div", {}, el("span", { class: "small" }, "지금 행동"), el("strong", {}, action)),
+      el("div", {}, el("span", { class: "small" }, "당일 흐름"), el("strong", {}, flow))),
+    el("div", { class: "risk-grid" },
+      el("div", {}, el("span", { class: "small" }, "FOMO 위험"), el("strong", {}, riskValue(o.fomo_risk))),
+      el("div", {}, el("span", { class: "small" }, "하락 기회착시"), el("strong", {}, riskValue(o.falling_knife_risk))),
+      el("div", {}, el("span", { class: "small" }, "객관성 이탈"), el("strong", {}, riskValue(o.objectivity_risk)))),
+    el("p", { class: "objectivity-copy" },
+      o.stance === "buy_state"
+        ? "보유 이유가 현재 흐름에서 사라지면 나온다. 짧게 시작한 거래를 장기투자로 구조하지 않는다."
+        : "현금은 다음 비대칭을 살 권리다. 이미 오른 가격을 놓친 것은 손실이 아니며, 싸졌다는 사실만으로 기회가 되지 않는다."));
+}
 function recommendationView(symbol, latest) {
   if (!latest || latest.warmup) return null;
   const key = `${symbol}|${latest.timestamp}`;
@@ -168,6 +213,7 @@ function symbolCard(code, s, jevEnabled) {
     s.error ? el("p", { class: "error" }, `폴링 오류: ${s.error}`) : null,
     latest ? el("p", { class: "small" },
       `마지막 봉 ${latest.timestamp} · 신호 ${latest.signals.join(", ")} · Jev ${jevEnabled ? (latest.jev ? "패턴 판별 활성" : "응답 없음") : "꺼짐(키 없음)"}`) : null,
+    latest ? openingHourView(latest) : null,
     latest ? axesView(latest.scores) : null,
     latest ? patternView(latest.patterns) : null,
     latest ? el("p", { class: "small" }, `측정 안 된 항목: ${latest.unmeasured.join(", ")}`) : null,
