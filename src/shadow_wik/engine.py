@@ -5,9 +5,10 @@ from typing import Any
 
 from .features import compute_features
 from .fingerprint import build_breakout_long_fingerprint
-from .jev import JevClient, build_questions, summarize_exit_focus
+from .jev import JevClient, build_questions, summarize_exit_focus, summarize_scalp_patterns
 from .models import MarketSnapshot
 from .personas import infer_market_persona_clusters, infer_position_personas
+from .scalp_patterns import pattern_catalog
 from .signals import build_signals
 from .trade_lifecycle import TradePlan, build_trade_state
 from .visual_grammar import build_visual_state
@@ -21,6 +22,7 @@ class ShadowEngine:
         previous_features: dict[str, float] | None = None,
         trade_plan: TradePlan | None = None,
         current_price: float | None = None,
+        include_scalp_patterns: bool = False,
     ) -> dict[str, Any]:
         s = snapshot.normalized()
         features = compute_features(s)
@@ -33,7 +35,7 @@ class ShadowEngine:
                 raise ValueError("current_price is required when trade_plan is supplied")
             trade_state = build_trade_state(trade_plan, now=s.timestamp, current_price=current_price)
 
-        questions = build_questions(include_exit=trade_plan is not None)
+        questions = build_questions(include_exit=trade_plan is not None, include_scalp=include_scalp_patterns)
         jev_state = {
             "symbol": s.symbol,
             "timestamp": s.timestamp,
@@ -76,6 +78,8 @@ class ShadowEngine:
         }
         if trade_state is not None:
             jev_state["trade_lifecycle"] = trade_state
+        if include_scalp_patterns:
+            jev_state["scalp_pattern_hypotheses"] = pattern_catalog()
 
         result: dict[str, Any] = {
             "snapshot": s.to_dict(),
@@ -85,9 +89,12 @@ class ShadowEngine:
             "trade_state": trade_state,
             "jev_request": {"state": jev_state, "questions": questions},
             "jev": None,
+            "scalp_patterns": {},
         }
         if jev is not None:
             result["jev"] = jev.evaluate(jev_state, questions)
+            if include_scalp_patterns:
+                result["scalp_patterns"] = summarize_scalp_patterns(result["jev"])
 
         fingerprint = build_breakout_long_fingerprint(result["features"], result["jev"])
         result["fingerprint"] = {
