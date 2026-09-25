@@ -2,12 +2,12 @@
   "schema_version": 1,
   "kind": "execution_graph",
   "run_id": "shadow-sensory-v1",
-  "revision": 5,
+  "revision": 6,
   "locale": "ko",
   "intent_file": "intent.md",
-  "intent_sha256": "37d462433bb080b010c9eb65d0b07d6c78c76e8d9abc5b5c09764d3d0b02730b",
-  "mission": "기술 안정성 위에 실제 체결 수익성을 검증하고, 선택한 운영형이 자동주문이면 별도 안전·권한 Gate까지 통과한 뒤에만 개발종료를 선언한다.",
-  "focus": "M8",
+  "intent_sha256": "3049047c6098b52287ff32f792b1b92bc41625e093895294656e76b6fbff4cbf",
+  "mission": "공개 근거의 단타 패턴을 Jev가 실시간 판별하고 1억원 무레버리지 paper 포트폴리오에서 탐색·검증한 뒤 실제 체결 수익성 M8로 승격한다.",
+  "focus": "M5",
   "nodes": [
     {
       "id": "M1",
@@ -131,15 +131,19 @@
     {
       "id": "M5",
       "label": "패턴 가상체결 검증",
-      "outcome": "특정 패턴이 발생한 순간 가상 진입하고 이후 가격으로 비용 포함 수익률을 계산해 패턴별 실현 성과를 축적한다.",
+      "outcome": "공개 근거에서 구조화한 단타 패턴을 Jev raw probability로 판별하고, dashboard 검증 강도와 1억원 paper 자본 제약 아래 가상체결하여 패턴별 Evidence를 축적한다.",
       "depends_on": [
         "M4"
       ],
-      "review_question": "현재 패턴의 성과는 실제로 전향적으로 기록된 것인가, 아니면 사후 차트선택의 결과인가?",
+      "review_question": "탐색적 Jev 패턴 인식을 통계적 유의성이나 실제 승률로 오인하거나, 가상 자본 한도를 넘겨 거래하고 있지 않은가?",
       "artifacts": [
         "src/shadow_wik/paper_trading.py",
         "src/shadow_wik/paper_cli.py",
-        "config/patterns.example.json"
+        "config/patterns.example.json",
+        "src/shadow_wik/scalp_patterns.py",
+        "src/shadow_wik/paper_portfolio.py",
+        "src/shadow_wik/webui/server.py",
+        "src/shadow_wik/webui/static/app.js"
       ],
       "maker": "host-maker",
       "review": "separated",
@@ -176,6 +180,45 @@
           "evidence_types": [
             "test",
             "observation"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C5D",
+          "statement": "Opening-range breakout, intraday momentum, order-flow persistence, opening-shock reversal을 명시적 hypothesis/반증조건으로 보존하고 Jev가 각 패턴을 독립 raw probability로 판별한다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_scalp_patterns.py -v",
+          "target": "4개 pattern question opt-in, probability extraction, Jev 없는 경우 확률 조작 없음",
+          "evidence_types": [
+            "test",
+            "case_analysis"
+          ],
+          "benchmark_required": true,
+          "benchmark_ids": [
+            "B-SCALP-ORB-2013",
+            "B-SCALP-MOM-2018",
+            "B-SCALP-OFI-2013",
+            "B-SCALP-REV-2019"
+          ]
+        },
+        {
+          "id": "C5E",
+          "statement": "Dashboard 검증 강도는 0~100이고 기본 0은 탐색 모드다. 값을 올리면 Jev floor와 paper-history evidence gate가 강화되지만 M8 live_real 기준은 변하지 않는다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_scalp_patterns.py tests/test_webui_settings.py tests/test_field_validation.py -v",
+          "target": "0=exploration, 100 stricter than 0, paper records remain excluded from M8",
+          "evidence_types": [
+            "test"
+          ],
+          "benchmark_required": false,
+          "benchmark_ids": []
+        },
+        {
+          "id": "C5F",
+          "statement": "가상 포트폴리오는 100,000,000 KRW seed, 기본 10%/trade, 최대 10 positions, 무레버리지로 제한되고 비용 반영 paper return으로 자본을 갱신한다.",
+          "method": "PYTHONPATH=src python -m unittest tests/test_scalp_patterns.py tests/test_paper_trading.py -v && python scripts/release_check.py",
+          "target": "10개 10% reservation 후 cash=0, 11번째 차단, 비용 후 PnL 반영, real_order_markers=[]",
+          "evidence_types": [
+            "test"
           ],
           "benchmark_required": false,
           "benchmark_ids": []
