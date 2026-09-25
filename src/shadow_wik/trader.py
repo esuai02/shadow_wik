@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .bar_features import WINDOW, snapshot_from_bars
+from .bar_features import WINDOW, snapshot_from_bars, snapshot_from_opening_bars
 from .engine import ShadowEngine
 from .jev import JevClient
 from .journal import DecisionLedger
@@ -50,8 +50,8 @@ def session_bars(symbol: str, bars: list[dict[str, Any]]) -> list[dict[str, Any]
 
 
 def frames_from_bars(symbol: str, bars: list[dict[str, Any]], engine: ShadowEngine | None = None,
-                     jev: JevClient | None = None) -> list[tuple[MarketFrame, dict[str, Any]]]:
-    """One frame per bar once WINDOW bars of the same session exist (after the session filter)."""
+                     jev: JevClient | None = None, opening_partial: bool = False) -> list[tuple[MarketFrame, dict[str, Any]]]:
+    """One frame per bar; live opening mode may start from 3 completed bars for Jev observation."""
     engine = engine or ShadowEngine()
     bars = session_bars(symbol, bars)
     out: list[tuple[MarketFrame, dict[str, Any]]] = []
@@ -60,10 +60,13 @@ def frames_from_bars(symbol: str, bars: list[dict[str, Any]], engine: ShadowEngi
     for i, bar in enumerate(bars):
         if i and bar["time"][:10] != bars[i - 1]["time"][:10]:
             session_start, previous = i, None
-        if i + 1 - session_start < WINDOW:
-            continue
         session = bars[session_start:i + 1]
-        snapshot = snapshot_from_bars(symbol, session[-WINDOW:], session)
+        if len(session) < WINDOW:
+            if not (opening_partial and len(session) >= 3 and in_opening_hour(symbol, bar["time"])):
+                continue
+            snapshot = snapshot_from_opening_bars(symbol, session)
+        else:
+            snapshot = snapshot_from_bars(symbol, session[-WINDOW:], session)
         analysis = engine.analyze(snapshot, jev=jev, previous_features=previous)
         previous = analysis["features"]
         frame = MarketFrame.from_analysis(symbol=symbol, timestamp=bar["time"], price=bar["close"], analysis=analysis)
@@ -197,13 +200,14 @@ class LiveTrader:
         bars = completed(bars, now or datetime.now(timezone.utc))
         today = [b for b in bars if b["time"][:10] == bars[-1]["time"][:10]] if bars else []
         warmup = self.last_time is None
-        for frame, analysis in frames_from_bars(self.symbol, today, self.engine):
+        for frame, analysis in frames_from_bars(self.symbol, today, self.engine, opening_partial=True):
             if not warmup and frame.timestamp <= self.last_time:
                 continue
             jev_view = None
             scalp_probabilities: dict[str, float] = {}
             opening_hour = None
             primitive_mechanisms = None
+            partial_opening = bool(analysis["snapshot"]["metadata"].get("partial_opening"))
             zone = zone_status(frame.scores, self.report)
             jev_trigger = None if warmup or self.jev is None else self._jev_trigger(frame, analysis, zone)
             if jev_trigger is not None:
@@ -237,7 +241,7 @@ class LiveTrader:
                     frame.scores,
                     jev_view if self.paper_mode == "jev_scalp" else None,
                 )
-                result = {"opened": [], "closed": []} if warmup else self.harness.on_frame(
+                result = {"opened": [], "closed": []} if warmup or partial_opening else self.harness.on_frame(
                     trade_frame,
                     allow_open=self.portfolio.reserve,
                 )
@@ -264,6 +268,7 @@ class LiveTrader:
                     "jev_trigger": jev_trigger,
                     "opening_hour": opening_hour,
                     "primitive_mechanisms": primitive_mechanisms,
+                    "partial_opening": partial_opening,
                     "unmeasured": analysis["snapshot"]["metadata"].get("unmeasured", []),
                     "opened": [t.to_dict() for t in result["opened"]],
                     "closed": [t.to_dict() for t in result["closed"]],
