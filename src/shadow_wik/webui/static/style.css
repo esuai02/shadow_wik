@@ -60,3 +60,29 @@ th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line
 @media (max-width: 700px) {
   .pattern-row { grid-template-columns: 1fr 80px; }
 }
+
+.opening-card { margin: 14px 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.opening-card.buy { border-left: 5px solid var(--good); }
+.opening-card.sell { border-left: 5px solid var(--warn); }
+.opening-card.quiet { opacity: .72; }
+.opening-head, .risk-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.opening-head > div, .risk-grid > div { display: grid; gap: 2px; }
+.opening-stance { font-size: 20px; }
+.risk-grid { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.objectivity-copy { margin: 10px 0 0; font-size: 13px; font-weight: 600; }
+@media (max-width: 700px) {
+  .opening-head, .risk-grid { grid-template-columns: 1fr; }
+}
+
+.mechanism-card { margin: 12px 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.mechanism-title { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mechanism-bars { display: grid; gap: 7px; }
+.mechanism-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 3fr) 58px; align-items: center; gap: 10px; }
+.mechanism-label { font-size: 12px; font-weight: 600; }
+.mechanism-track { height: 10px; background: var(--off-bg); border-radius: 999px; overflow: hidden; }
+.mechanism-fill { height: 100%; background: var(--bar); transition: width .2s ease; }
+.mechanism-prob { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+@media (max-width: 700px) {
+  .mechanism-row { grid-template-columns: 1fr 54px; }
+  .mechanism-track { grid-column: 1 / -1; grid-row: 2; }
+}

@@ -96,6 +96,75 @@ function patternView(patterns) {
       el("span", { class: "small" }, p.eligible ? "진입 가능" : (p.recognized ? "history gate 대기" : "미인식")))));
 }
 
+function mechanismBars(mechanisms) {
+  if (!mechanisms) {
+    return el("p", { class: "small" }, "Jev 원시 메커니즘 대기");
+  }
+  const order = [
+    "trend_continuation", "breakout", "pullback", "volatility_expansion",
+    "mean_reversion", "information_drift", "liquidity_imbalance",
+  ];
+  return el("section", { class: "mechanism-card" },
+    el("div", { class: "mechanism-title" },
+      el("strong", {}, "Jev · 7개 원시 메커니즘"),
+      el("span", { class: "small" }, "현재 작동 중일 확률 · 수익확률 아님")),
+    el("div", { class: "mechanism-bars" }, order.map((key) => {
+      const item = mechanisms[key] || {};
+      const p = typeof item.probability === "number" ? item.probability : null;
+      const pct = p === null ? 0 : Math.max(0, Math.min(100, p * 100));
+      return el("div", { class: "mechanism-row" },
+        el("span", { class: "mechanism-label" }, item.label || key),
+        el("div", { class: "mechanism-track" },
+          el("div", { class: "mechanism-fill", style: `width:${pct}%` })),
+        el("span", { class: "mechanism-prob" }, p === null ? "-" : `${fmt(pct, 1)}%`));
+    })));
+}
+
+function riskValue(answer) {
+  if (answer === null || answer === undefined) return "-";
+  if (typeof answer === "number") return fmt(answer, 1);
+  if (typeof answer === "object") {
+    if (typeof answer.score === "number") return fmt(answer.score, 1);
+    if (typeof answer.value === "number") return fmt(answer.value, 1);
+    if (typeof answer.choice === "string") return answer.choice;
+  }
+  return String(answer);
+}
+
+function openingHourView(latest) {
+  if (!latest) return null;
+  const o = latest.opening_hour;
+  const hm = (latest.timestamp || "").slice(11, 16);
+  const active = hm >= "09:00" && hm < "10:00";
+  if (!active) {
+    return el("section", { class: "opening-card quiet" },
+      el("strong", {}, "오늘의 60분 창 종료"),
+      el("p", { class: "small" }, "09:00~09:59 판단이 끝났습니다. 장기 포지션은 이 화면의 단기 판단과 분리합니다."));
+  }
+  if (!o || o.status !== "measured") {
+    return el("section", { class: "opening-card" },
+      el("strong", {}, "오프닝 60분 · Jev 재평가 대기"),
+      el("p", { class: "small" }, "다음 평가까지 신규 행동을 서두르지 않습니다. 놓친 상승은 손실이 아닙니다."));
+  }
+  const stance = o.stance === "buy_state" ? "매수 상태" : "매도 상태";
+  const action = o.stance === "buy_state"
+    ? ({hold:"보유", reduce:"축소", exit:"매도"}[o.buy_action] || o.buy_action || "-")
+    : ({enter:"진입", wait:"대기", observe_today:"오늘 관망"}[o.sell_action] || o.sell_action || "-");
+  const flow = ({uptrend:"상승 흐름", downtrend:"하락 흐름", range:"횡보", unstable:"불안정"}[o.flow] || o.flow || "-");
+  return el("section", { class: `opening-card ${o.stance === "buy_state" ? "buy" : "sell"}` },
+    el("div", { class: "opening-head" },
+      el("div", {}, el("span", { class: "small" }, "Jev 현재 상태"), el("strong", { class: "opening-stance" }, stance)),
+      el("div", {}, el("span", { class: "small" }, "지금 행동"), el("strong", {}, action)),
+      el("div", {}, el("span", { class: "small" }, "당일 흐름"), el("strong", {}, flow))),
+    el("div", { class: "risk-grid" },
+      el("div", {}, el("span", { class: "small" }, "FOMO 위험"), el("strong", {}, riskValue(o.fomo_risk))),
+      el("div", {}, el("span", { class: "small" }, "하락 기회착시"), el("strong", {}, riskValue(o.falling_knife_risk))),
+      el("div", {}, el("span", { class: "small" }, "객관성 이탈"), el("strong", {}, riskValue(o.objectivity_risk)))),
+    el("p", { class: "objectivity-copy" },
+      o.stance === "buy_state"
+        ? "보유 이유가 현재 흐름에서 사라지면 나온다. 짧게 시작한 거래를 장기투자로 구조하지 않는다."
+        : "현금은 다음 비대칭을 살 권리다. 이미 오른 가격을 놓친 것은 손실이 아니며, 싸졌다는 사실만으로 기회가 되지 않는다."));
+}
 function recommendationView(symbol, latest) {
   if (!latest || latest.warmup) return null;
   const key = `${symbol}|${latest.timestamp}`;
@@ -157,9 +226,7 @@ function portfolioView(p) {
 
 function symbolCard(code, s, jevEnabled) {
   const latest = s.latest;
-  const modeBadge = s.paper_mode === "jev_scalp"
-    ? el("span", { class: "badge sig" }, "Jev 단타패턴")
-    : el("span", { class: "badge warn" }, "통계 zone fallback");
+  const modeBadge = el("span", { class: "badge sig" }, "오프닝 60분");
   return el("section", { class: "card" },
     el("div", { class: "head" },
       el("h2", {}, code),
@@ -168,17 +235,13 @@ function symbolCard(code, s, jevEnabled) {
     s.error ? el("p", { class: "error" }, `폴링 오류: ${s.error}`) : null,
     latest ? el("p", { class: "small" },
       `마지막 봉 ${latest.timestamp} · 신호 ${latest.signals.join(", ")} · Jev ${jevEnabled ? (latest.jev ? "패턴 판별 활성" : "응답 없음") : "꺼짐(키 없음)"}`) : null,
+    latest ? openingHourView(latest) : null,
+    latest ? mechanismBars(latest.primitive_mechanisms) : null,
     latest ? axesView(latest.scores) : null,
-    latest ? patternView(latest.patterns) : null,
     latest ? el("p", { class: "small" }, `측정 안 된 항목: ${latest.unmeasured.join(", ")}`) : null,
     stripView(s.recent),
-    recommendationView(code, latest),
-    el("h3", {}, "가상 포지션 / 최근 청산"),
-    tradesTable([...s.open_trades, ...s.closed_trades]),
-    s.performance.length ? el("p", { class: "small" }, s.performance.map((p) =>
-      `${p.pattern}: ${p.trades}회 승률 ${fmt(p.win_rate * 100, 1)}% 평균 ${fmt(p.average_return_pct, 3)}%`).join(" / ")) : null,
-    el("h3", {}, "참고용 기존 통계 zone"),
-    zonesView(zoneCache[code]));
+    el("h3", {}, "오프닝 60분 가상매매 이력"),
+    tradesTable([...s.open_trades, ...s.closed_trades]));
 }
 
 function showError(err) {

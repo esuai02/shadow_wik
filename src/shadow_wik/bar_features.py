@@ -76,6 +76,75 @@ def measure(bars: list[dict[str, Any]], session: list[dict[str, Any]]) -> dict[s
     }
 
 
+
+def measure_opening_partial(bars: list[dict[str, Any]], session: list[dict[str, Any]]) -> dict[str, float]:
+    """Reduced-window measurements for the first minutes after the open.
+
+    Tagged as partial and intended for Jev observation only until WINDOW bars exist.
+    """
+    if len(bars) < 3:
+        raise ValueError(f"bar_features.py: need at least 3 opening bars, got {len(bars)}")
+    w = bars[-min(WINDOW, len(bars)):]
+    last = w[-1]
+    closes = [b["close"] for b in w]
+    moves = [b - a for a, b in zip(closes, closes[1:])]
+    ups = sum(1 for m in moves if m > 0)
+    downs = sum(1 for m in moves if m < 0)
+    vol_up = sum(b["volume"] for a, b in zip(w, w[1:]) if b["close"] > a["close"])
+    vol_down = sum(b["volume"] for a, b in zip(w, w[1:]) if b["close"] < a["close"])
+    hi = max(b["high"] for b in w)
+    lo = min(b["low"] for b in w)
+    recent_n = min(RECENT, len(w))
+    recent = w[-recent_n:]
+    prior = w[:-recent_n]
+    avg_vol = sum(b["volume"] for b in w) / len(w)
+    recent_vol = sum(b["volume"] for b in recent) / len(recent)
+    sess_vol = sum(b["volume"] for b in session)
+    vwap = _ratio(sum(b["close"] * b["volume"] for b in session), sess_vol, last["close"])
+    last10 = w[-min(10, len(w)):]
+    wick = [_ratio(b["high"] - b["close"], b["high"] - b["low"], 0.0) for b in last10]
+    loc_weight = sum(b["volume"] for b in last10)
+
+    if prior:
+        prior_hi = max(b["high"] for b in prior)
+        prior_lo = min(b["low"] for b in prior)
+        prior_width = prior_hi - prior_lo
+        range_break_distance = clamp(50 + 50 * _ratio(last["close"] - prior_hi, prior_width, 0.0))
+        outside_range_persistence = 100 * sum(1 for b in recent if b["close"] > prior_hi) / len(recent)
+    else:
+        range_break_distance = 50.0
+        outside_range_persistence = 0.0
+
+    return {
+        "trend_persistence": 100 * _ratio(ups, ups + downs),
+        "impulse_retention": 100 * _ratio(last["close"] - lo, hi - lo),
+        "up_down_volume_asymmetry": 100 * _ratio(vol_up, vol_up + vol_down),
+        "recovery_efficiency": 50 + 50 * _ratio(closes[-1] - closes[0], sum(abs(m) for m in moves), 0.0),
+        "rejection_compression": 100 * (1 - sum(wick) / len(wick)),
+        "volume_anomaly": clamp(50 * _ratio(recent_vol, avg_vol, 1.0)),
+        "range_break_distance": range_break_distance,
+        "outside_range_persistence": outside_range_persistence,
+        "near_resistance_dwell": 100 * sum(1 for b in last10 if b["high"] >= hi * (1 - DWELL_BAND_PCT / 100)) / len(last10),
+        "aggressive_buy_pressure": 100 * _ratio(sum(_close_location(b) * b["volume"] for b in last10), loc_weight),
+        "vwap_hold": 100 * sum(1 for b in last10 if b["close"] >= vwap) / len(last10),
+    }
+
+
+def snapshot_from_opening_bars(symbol: str, session: list[dict[str, Any]]) -> MarketSnapshot:
+    fields = {k: round(clamp(v), 2) for k, v in measure_opening_partial(session, session).items()}
+    return MarketSnapshot(
+        symbol=symbol,
+        timestamp=session[-1]["time"],
+        metadata={
+            "source": "kiwoom:ka10080",
+            "measured": list(MEASURED),
+            "unmeasured": list(UNMEASURED),
+            "partial_opening": True,
+            "sample_bars": len(session),
+        },
+        **fields,
+    )
+
 def snapshot_from_bars(symbol: str, bars: list[dict[str, Any]], session: list[dict[str, Any]]) -> MarketSnapshot:
     fields = {k: round(clamp(v), 2) for k, v in measure(bars, session).items()}
     return MarketSnapshot(

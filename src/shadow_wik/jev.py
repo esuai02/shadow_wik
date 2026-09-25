@@ -152,7 +152,193 @@ def summarize_scalp_patterns(response: dict[str, Any] | None) -> dict[str, float
     return out
 
 
-def build_questions(*, include_exit: bool = False, include_scalp: bool = False) -> dict[str, Any]:
+
+
+PRIMITIVE_MECHANISMS = {
+    "trend_continuation": {
+        "label": "Trend continuation",
+        "true": "Directional persistence is currently more likely to continue than to mean-revert inside the opening observation horizon.",
+        "false": "Directional persistence is weak, exhausted, or more consistent with rotation/reversal.",
+    },
+    "breakout": {
+        "label": "Breakout",
+        "true": "Price is accepting beyond a meaningful prior range/resistance with enough persistence to treat the break as active.",
+        "false": "Price remains inside the prior range or the apparent break is not being accepted.",
+    },
+    "pullback": {
+        "label": "Pullback continuation",
+        "true": "A counter-move is behaving like a temporary retracement inside an intact directional move rather than a reversal.",
+        "false": "The counter-move is too deep, persistent, or structurally damaging to call a continuation pullback.",
+    },
+    "volatility_expansion": {
+        "label": "Volatility contraction → expansion",
+        "true": "Recent compression is resolving into a directional expansion with increasing range/participation.",
+        "false": "There is no meaningful compression-to-expansion transition or expansion lacks persistence.",
+    },
+    "mean_reversion": {
+        "label": "Mean reversion",
+        "true": "The current displacement is more likely to rotate back toward a recent accepted mean/value area than continue extending.",
+        "false": "The displacement is being accepted and continuation dominates mean-reversion evidence.",
+    },
+    "information_drift": {
+        "label": "Information / event drift",
+        "true": "A visible or inferred information shock is plausibly still being incorporated into price rather than already fully absorbed.",
+        "false": "No distinct information-diffusion effect is observed, or the event appears fully absorbed.",
+    },
+    "liquidity_imbalance": {
+        "label": "Supply-demand / liquidity imbalance",
+        "true": "Observed price/volume/microstructure evidence indicates one side is consuming available liquidity faster than the other.",
+        "false": "Order-flow pressure is balanced, unobserved, or insufficient to claim a directional liquidity imbalance.",
+    },
+}
+
+
+def build_primitive_mechanism_questions() -> dict[str, Any]:
+    questions: dict[str, Any] = {}
+    for key, spec in PRIMITIVE_MECHANISMS.items():
+        questions[f"mechanism_{key}"] = {
+            "type": "noul",
+            "instructions": (
+                f"Estimate whether the primitive market mechanism '{spec['label']}' is currently active "
+                "in the supplied opening-hour state. This is a mechanism-presence probability, not a probability of profit."
+            ),
+            "criteria": {"true": spec["true"], "false": spec["false"]},
+        }
+    return questions
+
+
+def summarize_primitive_mechanisms(response: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    answers = (response or {}).get("answers", {})
+    out: dict[str, dict[str, Any]] = {}
+    for key, spec in PRIMITIVE_MECHANISMS.items():
+        value = answers.get(f"mechanism_{key}", {}).get("noul")
+        probability = None
+        if isinstance(value, (int, float)):
+            probability = round(max(0.0, min(1.0, float(value))), 6)
+        out[key] = {"label": spec["label"], "probability": probability}
+    return out
+
+def build_opening_hour_questions() -> dict[str, Any]:
+    """Questions for one operating mode: the first 60 minutes of the KRX session."""
+    return {
+        "opening_hour_stance": {
+            "type": "choice",
+            "instructions": (
+                "Inside the first 60 minutes after the KRX open, choose the current base operating stance. "
+                "Choose buy_state only when today's observed flow supports taking/keeping long exposure. "
+                "Otherwise choose sell_state; sell_state includes staying in cash."
+            ),
+            "criteria": {
+                "buy_state": "Today's observed opening flow supports long exposure strongly enough to justify accepting near-term downside risk.",
+                "sell_state": "Evidence does not justify long exposure yet, or protecting optionality/cash is superior to chasing the move.",
+            },
+        },
+        "opening_hour_flow": {
+            "type": "choice",
+            "instructions": "Classify the currently observed opening-hour flow without extending the claim to the whole trading day.",
+            "criteria": {
+                "uptrend": "Price/volume structure is persistently accepting higher levels.",
+                "downtrend": "Price/volume structure is persistently accepting lower levels.",
+                "range": "Neither side has durable control and price is rotating.",
+                "unstable": "Direction is changing too quickly or evidence is too contradictory for a stable flow label.",
+            },
+        },
+        "buy_state_action": {
+            "type": "choice",
+            "instructions": (
+                "If already operating in buy_state, choose the action for the opening-hour trade. "
+                "The decision must remain inside the first 60-minute window; do not rescue a bad short-horizon trade by inventing a longer thesis."
+            ),
+            "criteria": {
+                "hold": "The opening thesis remains intact and the exit condition has not arrived.",
+                "reduce": "The edge has weakened enough that preserving capital is preferable to full exposure.",
+                "exit": "The opening thesis is invalidated, the risk/reward has deteriorated, or the planned opening-hour window is ending.",
+            },
+        },
+        "sell_state_action": {
+            "type": "choice",
+            "instructions": (
+                "If operating in sell_state, decide whether today's opening flow justifies a new long entry. "
+                "A missed rise is not a realized loss; waiting or observing the whole day are valid outcomes."
+            ),
+            "criteria": {
+                "enter": "Fresh evidence shows a sufficiently asymmetric long entry now.",
+                "wait": "The setup may become attractive but confirmation is still missing.",
+                "observe_today": "Today's opening flow does not justify taking this risk; preserve cash/optionality.",
+            },
+        },
+        "fomo_risk": {
+            "type": "score",
+            "instructions": (
+                "Rate the risk that a long decision is being driven by fear of missing already-visible upside rather than current forward asymmetry. "
+                "Treat uncaptured upside as hypothetical money, not a loss."
+            ),
+            "criteria": [
+                "Low: entry/hold case is independent of the recent rise and has clear invalidation.",
+                "Moderate: recent price strength is influencing urgency but evidence remains balanced.",
+                "High: the main pressure to act is that price is running without us.",
+                "Extreme: the decision is mostly an attempt to recover imagined missed profit.",
+            ],
+        },
+        "falling_knife_risk": {
+            "type": "score",
+            "instructions": (
+                "Rate the risk of calling a falling price an opportunity merely because it is cheaper. "
+                "A lower price alone is not evidence of stabilization or reversal."
+            ),
+            "criteria": [
+                "Low: deterioration has stopped and independent stabilization/reversal evidence is present.",
+                "Moderate: some stabilization appears but downside control is not established.",
+                "High: price is still accepting lower levels and the opportunity thesis is mostly price-cheapness.",
+                "Extreme: the trade would average into unresolved downside momentum without a falsifiable reversal signal.",
+            ],
+        },
+        "objectivity_risk": {
+            "type": "score",
+            "instructions": (
+                "Rate how much current P/L, recent missed moves, attachment to an earlier thesis, or urge to be active could distort the next opening-hour decision."
+            ),
+            "criteria": [
+                "Low: current decision can be stated from present evidence with a clear exit/inaction condition.",
+                "Moderate: some emotional or position influence is visible but counterevidence is still considered.",
+                "High: current position, missed move, or recent loss is materially steering interpretation.",
+                "Extreme: the next action is mainly justified by recovering, proving, chasing, or refusing to miss rather than current evidence.",
+            ],
+        },
+    }
+
+
+def summarize_opening_hour_focus(response: dict[str, Any] | None) -> dict[str, Any]:
+    if not response:
+        return {
+            "status": "unmeasured",
+            "stance": None,
+            "stance_probabilities": {},
+            "flow": None,
+            "buy_action": None,
+            "sell_action": None,
+            "fomo_risk": None,
+            "falling_knife_risk": None,
+            "objectivity_risk": None,
+        }
+    answers = response.get("answers", {})
+    stance = answers.get("opening_hour_stance", {})
+    flow = answers.get("opening_hour_flow", {})
+    buy_action = answers.get("buy_state_action", {})
+    sell_action = answers.get("sell_state_action", {})
+    return {
+        "status": "measured" if stance else "missing_opening_hour_answer",
+        "stance": stance.get("choice"),
+        "stance_probabilities": stance.get("probabilities", {}),
+        "flow": flow.get("choice"),
+        "buy_action": buy_action.get("choice"),
+        "sell_action": sell_action.get("choice"),
+        "fomo_risk": answers.get("fomo_risk"),
+        "falling_knife_risk": answers.get("falling_knife_risk"),
+        "objectivity_risk": answers.get("objectivity_risk"),
+    }
+
+def build_questions(*, include_exit: bool = False, include_scalp: bool = False, include_opening_hour: bool = False) -> dict[str, Any]:
     questions = {
         "breakout_next_window": {
             "type": "noul",
@@ -225,6 +411,9 @@ def build_questions(*, include_exit: bool = False, include_scalp: bool = False) 
     }
     if include_scalp:
         questions.update(build_scalp_pattern_questions())
+    if include_opening_hour:
+        questions.update(build_opening_hour_questions())
+        questions.update(build_primitive_mechanism_questions())
     if include_exit:
         questions.update(build_exit_questions())
     return questions
