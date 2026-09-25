@@ -7,6 +7,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from .envfile import read_env_key
+
 from .scalp_patterns import SCALP_PATTERNS
 
 DEFAULT_BASE_URL = "https://api.typesafe.ai"
@@ -27,8 +29,14 @@ class JevClient:
     @classmethod
     def from_env(cls) -> "JevClient":
         api_key = os.getenv("TYPESAFE_API_KEY", "").strip()
+        key_file = os.getenv("TYPESAFE_KEY_FILE", "").strip()
+        if not api_key and key_file:
+            try:
+                api_key = read_env_key(key_file, "TYPESAFE_API_KEY")
+            except ValueError as exc:
+                raise JevError(f"jev.py: TYPESAFE_KEY_FILE: {exc}") from None
         if not api_key:
-            raise JevError("TYPESAFE_API_KEY is not set")
+            raise JevError("jev.py: set TYPESAFE_API_KEY or TYPESAFE_KEY_FILE")
         return cls(
             api_key=api_key,
             model=os.getenv("JEV_MODEL", DEFAULT_MODEL),

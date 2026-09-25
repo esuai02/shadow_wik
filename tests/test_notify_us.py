@@ -66,6 +66,15 @@ class TelegramTests(unittest.TestCase):
         self.assertIsNotNone(n)
         self.assertEqual((n._token, n.chat_id), ("abc:123", "42"))
 
+    def test_jev_key_read_from_file_when_env_empty(self):
+        from shadow_wik.jev import JevClient
+        with tempfile.NamedTemporaryFile("w", suffix=".env", delete=False) as f:
+            f.write("TYPESAFE_API_KEY=ts-test\n")
+        with mock.patch.dict(os.environ, {"TYPESAFE_API_KEY": "", "TYPESAFE_KEY_FILE": f.name}):
+            client = JevClient.from_env()
+        os.unlink(f.name)
+        self.assertEqual(client.api_key, "ts-test")
+
     def test_disabled_without_chat_id(self):
         with mock.patch.dict(os.environ, {"TELEGRAM_CHAT_ID": "", "TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_TOKEN_FILE": ""}):
             self.assertIsNone(TelegramNotifier.from_env())

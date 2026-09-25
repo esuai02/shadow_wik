@@ -11,8 +11,9 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 from typing import Any
+
+from .envfile import read_env_key
 
 TOKEN_KEY = "TELEGRAM_BOT_TOKEN"
 MAX_TEXT = 3500
@@ -20,18 +21,6 @@ MAX_TEXT = 3500
 
 class TelegramError(RuntimeError):
     pass
-
-
-def _token_from_file(path: str) -> str:
-    try:
-        lines = Path(path).expanduser().read_text(encoding="utf-8").splitlines()
-    except OSError as exc:
-        raise TelegramError(f"notify_telegram.py: cannot read TELEGRAM_TOKEN_FILE: {exc}") from exc
-    for line in lines:
-        key, _, value = line.strip().partition("=")
-        if key.strip() == TOKEN_KEY:
-            return value.strip().strip('"').strip("'")
-    raise TelegramError(f"notify_telegram.py: {TOKEN_KEY} not found in TELEGRAM_TOKEN_FILE")
 
 
 class TelegramNotifier:
@@ -46,7 +35,10 @@ class TelegramNotifier:
         token = os.getenv(TOKEN_KEY, "").strip()
         token_file = os.getenv("TELEGRAM_TOKEN_FILE", "").strip()
         if not token and token_file:
-            token = _token_from_file(token_file)
+            try:
+                token = read_env_key(token_file, TOKEN_KEY)
+            except ValueError as exc:
+                raise TelegramError(f"notify_telegram.py: TELEGRAM_TOKEN_FILE: {exc}") from None
         if not token or not chat_id:
             return None
         return cls(token, chat_id)
