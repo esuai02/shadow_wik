@@ -5,7 +5,7 @@ from typing import Any
 
 from .features import compute_features
 from .fingerprint import build_breakout_long_fingerprint
-from .jev import JevClient, build_questions, summarize_exit_focus, summarize_scalp_patterns
+from .jev import JevClient, build_questions, summarize_exit_focus, summarize_opening_hour_focus, summarize_scalp_patterns
 from .models import MarketSnapshot
 from .personas import infer_market_persona_clusters, infer_position_personas
 from .scalp_patterns import pattern_catalog
@@ -48,6 +48,7 @@ class ShadowEngine:
         trade_plan: TradePlan | None = None,
         current_price: float | None = None,
         include_scalp_patterns: bool = False,
+        include_opening_hour: bool = False,
     ) -> dict[str, Any]:
         s = snapshot.normalized()
         features = compute_features(s)
@@ -60,7 +61,11 @@ class ShadowEngine:
                 raise ValueError("current_price is required when trade_plan is supplied")
             trade_state = build_trade_state(trade_plan, now=s.timestamp, current_price=current_price)
 
-        questions = build_questions(include_exit=trade_plan is not None, include_scalp=include_scalp_patterns)
+        questions = build_questions(
+            include_exit=trade_plan is not None,
+            include_scalp=include_scalp_patterns,
+            include_opening_hour=include_opening_hour,
+        )
         jev_state = {
             "symbol": s.symbol,
             "timestamp": s.timestamp,
@@ -108,6 +113,16 @@ class ShadowEngine:
             jev_state["trade_lifecycle"] = trade_state
         if include_scalp_patterns:
             jev_state["scalp_pattern_hypotheses"] = pattern_catalog()
+        if include_opening_hour:
+            jev_state["opening_hour_contract"] = {
+                "market_window": "KRX 09:00-09:59 KST only",
+                "decision": "choose buy_state or sell_state from current evidence; sell_state may remain cash all day",
+                "buy_state": "if long exposure exists, decide hold/reduce/exit inside the opening-hour window",
+                "sell_state": "decide enter/wait/observe_today; missed upside is not a realized loss",
+                "fomo": "uncaptured upside is hypothetical money and must not be treated as a loss to recover",
+                "falling_price": "a lower price alone is not an opportunity; require stabilization/reversal evidence",
+                "long_term": "passive long-term holdings are outside this opening-hour decision and must not rescue the thesis",
+            }
 
         result: dict[str, Any] = {
             "snapshot": s.to_dict(),
@@ -118,11 +133,14 @@ class ShadowEngine:
             "jev_request": {"state": jev_state, "questions": questions},
             "jev": None,
             "scalp_patterns": {},
+            "opening_hour": summarize_opening_hour_focus(None) if include_opening_hour else None,
         }
         if jev is not None:
             result["jev"] = jev.evaluate(jev_state, questions)
             if include_scalp_patterns:
                 result["scalp_patterns"] = summarize_scalp_patterns(result["jev"])
+            if include_opening_hour:
+                result["opening_hour"] = summarize_opening_hour_focus(result["jev"])
 
         fingerprint = build_breakout_long_fingerprint(result["features"], result["jev"])
         result["fingerprint"] = {
