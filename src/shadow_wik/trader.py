@@ -1,8 +1,8 @@
-"""Bars -> fingerprint frames -> significance zones -> live paper trading.
+"""Bars -> fingerprint -> Jev scalp hypotheses -> funded live paper trading.
 
-Paper only: this module has no broker order path. Live entries are limited to
-zones marked `significant` by zones.evaluate_zones; with no such zone, the
-trader observes and never trades.
+Paper only: this module has no broker order path. With Jev configured, live entries
+use the scalp hypothesis library and dashboard validation level. Without Jev, the
+older statistically-significant zone rules remain a conservative fallback.
 """
 from __future__ import annotations
 
