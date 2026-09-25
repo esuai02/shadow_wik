@@ -153,6 +153,71 @@ def summarize_scalp_patterns(response: dict[str, Any] | None) -> dict[str, float
 
 
 
+
+PRIMITIVE_MECHANISMS = {
+    "trend_continuation": {
+        "label": "Trend continuation",
+        "true": "Directional persistence is currently more likely to continue than to mean-revert inside the opening observation horizon.",
+        "false": "Directional persistence is weak, exhausted, or more consistent with rotation/reversal.",
+    },
+    "breakout": {
+        "label": "Breakout",
+        "true": "Price is accepting beyond a meaningful prior range/resistance with enough persistence to treat the break as active.",
+        "false": "Price remains inside the prior range or the apparent break is not being accepted.",
+    },
+    "pullback": {
+        "label": "Pullback continuation",
+        "true": "A counter-move is behaving like a temporary retracement inside an intact directional move rather than a reversal.",
+        "false": "The counter-move is too deep, persistent, or structurally damaging to call a continuation pullback.",
+    },
+    "volatility_expansion": {
+        "label": "Volatility contraction → expansion",
+        "true": "Recent compression is resolving into a directional expansion with increasing range/participation.",
+        "false": "There is no meaningful compression-to-expansion transition or expansion lacks persistence.",
+    },
+    "mean_reversion": {
+        "label": "Mean reversion",
+        "true": "The current displacement is more likely to rotate back toward a recent accepted mean/value area than continue extending.",
+        "false": "The displacement is being accepted and continuation dominates mean-reversion evidence.",
+    },
+    "information_drift": {
+        "label": "Information / event drift",
+        "true": "A visible or inferred information shock is plausibly still being incorporated into price rather than already fully absorbed.",
+        "false": "No distinct information-diffusion effect is observed, or the event appears fully absorbed.",
+    },
+    "liquidity_imbalance": {
+        "label": "Supply-demand / liquidity imbalance",
+        "true": "Observed price/volume/microstructure evidence indicates one side is consuming available liquidity faster than the other.",
+        "false": "Order-flow pressure is balanced, unobserved, or insufficient to claim a directional liquidity imbalance.",
+    },
+}
+
+
+def build_primitive_mechanism_questions() -> dict[str, Any]:
+    questions: dict[str, Any] = {}
+    for key, spec in PRIMITIVE_MECHANISMS.items():
+        questions[f"mechanism_{key}"] = {
+            "type": "noul",
+            "instructions": (
+                f"Estimate whether the primitive market mechanism '{spec['label']}' is currently active "
+                "in the supplied opening-hour state. This is a mechanism-presence probability, not a probability of profit."
+            ),
+            "criteria": {"true": spec["true"], "false": spec["false"]},
+        }
+    return questions
+
+
+def summarize_primitive_mechanisms(response: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    answers = (response or {}).get("answers", {})
+    out: dict[str, dict[str, Any]] = {}
+    for key, spec in PRIMITIVE_MECHANISMS.items():
+        value = answers.get(f"mechanism_{key}", {}).get("noul")
+        probability = None
+        if isinstance(value, (int, float)):
+            probability = round(max(0.0, min(1.0, float(value))), 6)
+        out[key] = {"label": spec["label"], "probability": probability}
+    return out
+
 def build_opening_hour_questions() -> dict[str, Any]:
     """Questions for one operating mode: the first 60 minutes of the KRX session."""
     return {
@@ -348,6 +413,7 @@ def build_questions(*, include_exit: bool = False, include_scalp: bool = False, 
         questions.update(build_scalp_pattern_questions())
     if include_opening_hour:
         questions.update(build_opening_hour_questions())
+        questions.update(build_primitive_mechanism_questions())
     if include_exit:
         questions.update(build_exit_questions())
     return questions
