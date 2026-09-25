@@ -11,14 +11,15 @@ from urllib.parse import parse_qs, urlparse
 
 from ..kiwoom_feed import KiwoomQuoteClient
 from ..notify_telegram import TelegramError, TelegramNotifier, zone_entry_message
+from ..paper_portfolio import PaperPortfolio
 from ..trader import LiveTrader
-from . import api_decision, api_state, api_zones
+from . import api_decision, api_settings, api_state, api_zones
 
 STATIC = Path(__file__).resolve().parent / "static"
 CONTENT_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8"}
 MAX_BODY = 4096
 GET_ROUTES = {"/api/state": api_state.handle, "/api/zones": api_zones.handle}
-POST_ROUTES = {"/api/decision": api_decision.handle}
+POST_ROUTES = {"/api/decision": api_decision.handle, "/api/settings": api_settings.handle}
 
 
 class Runtime:
@@ -28,8 +29,23 @@ class Runtime:
         self.reports = reports
         self.interval = interval
         self.decisions_path = state_dir / "decisions.jsonl"
+        self.settings_path = state_dir / "ui_settings.json"
+        self.validation_level = self._load_validation_level()
+        self.portfolio = PaperPortfolio(
+            seed_krw=100_000_000.0,
+            per_trade_fraction=0.10,
+            max_positions=10,
+            event_path=state_dir / "paper_portfolio.jsonl",
+        )
         self.traders = {
-            code: LiveTrader(code, report, state_dir / f"live_paper_{code}.jsonl", jev=jev)
+            code: LiveTrader(
+                code,
+                report,
+                state_dir / f"live_paper_{code}.jsonl",
+                jev=jev,
+                portfolio=self.portfolio,
+                validation_level=self.validation_level,
+            )
             for code, report in reports.items()
         }
         self.errors: dict[str, str | None] = {code: None for code in reports}
@@ -38,6 +54,24 @@ class Runtime:
         self.notifier = notifier
         self.alerts_path = state_dir / "alerts.jsonl"
         self._stop = threading.Event()
+
+    def _load_validation_level(self) -> int:
+        try:
+            data = json.loads(self.settings_path.read_text(encoding="utf-8"))
+            return max(0, min(100, int(data.get("validation_level", 0))))
+        except (FileNotFoundError, ValueError, TypeError, json.JSONDecodeError):
+            return 0
+
+    def set_validation_level(self, level: int) -> int:
+        value = max(0, min(100, int(level)))
+        self.validation_level = value
+        for trader in self.traders.values():
+            trader.set_validation_level(value)
+        self.settings_path.write_text(
+            json.dumps({"validation_level": value}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return value
 
     def poll_once(self) -> None:
         for code, trader in self.traders.items():
@@ -77,6 +111,8 @@ class Runtime:
             "interval": self.interval,
             "jev_enabled": self.jev_enabled,
             "telegram_enabled": self.notifier is not None,
+            "validation_level": self.validation_level,
+            "portfolio": self.portfolio.state(),
             "symbols": {code: {**t.state(), "error": self.errors[code]} for code, t in self.traders.items()},
         }
 
