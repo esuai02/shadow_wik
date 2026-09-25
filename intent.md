@@ -10,7 +10,9 @@
 - `sell_state`에서는 `enter/wait/observe_today`를 판단한다. 진입 근거가 없으면 하루 종일 관망할 수 있다.
 - 놓친 상승은 실현손실이 아니다. 아직 가지지 않은 수익을 회복해야 할 돈처럼 취급하지 않는다.
 - 가격이 하락했다는 이유만으로 기회로 간주하지 않는다. 하락 흐름의 중단·안정·반전 Evidence가 따로 필요하다.
-- Jev는 매 10분 내외로 현재 당일 흐름, FOMO 위험, 하락 기회착시 위험, 객관성 이탈 위험을 재평가한다.
+- Jev는 오프닝 60분의 완료된 1분 봉마다 현재 당일 흐름, FOMO 위험, 하락 기회착시 위험, 객관성 이탈 위험을 재평가한다.
+- 실시간 감각축은 Trend continuation / Breakout / Pullback / Volatility contraction→expansion / Mean reversion / Information-event drift / Supply-demand-liquidity imbalance의 7개 원시 메커니즘으로 압축한다. 각 값은 현재 메커니즘 활성 확률이며 수익확률로 해석하지 않는다.
+- 매매기법의 이름·유파 수를 늘리는 대신 위 7개 축의 조합으로 해석하며, 이름 자체를 신규 판단축으로 자동 증식하지 않는다.
 - 장기투자 포지션은 소액·저관여 별도 영역으로 취급하며 오프닝 60분 단기 thesis의 근거 또는 구조용 핑계로 사용하지 않는다.
 
 ## Beneficiary and operating conditions
