@@ -96,6 +96,30 @@ function patternView(patterns) {
       el("span", { class: "small" }, p.eligible ? "진입 가능" : (p.recognized ? "history gate 대기" : "미인식")))));
 }
 
+function mechanismBars(mechanisms) {
+  if (!mechanisms) {
+    return el("p", { class: "small" }, "Jev 원시 메커니즘 대기");
+  }
+  const order = [
+    "trend_continuation", "breakout", "pullback", "volatility_expansion",
+    "mean_reversion", "information_drift", "liquidity_imbalance",
+  ];
+  return el("section", { class: "mechanism-card" },
+    el("div", { class: "mechanism-title" },
+      el("strong", {}, "Jev · 7개 원시 메커니즘"),
+      el("span", { class: "small" }, "현재 작동 중일 확률 · 수익확률 아님")),
+    el("div", { class: "mechanism-bars" }, order.map((key) => {
+      const item = mechanisms[key] || {};
+      const p = typeof item.probability === "number" ? item.probability : null;
+      const pct = p === null ? 0 : Math.max(0, Math.min(100, p * 100));
+      return el("div", { class: "mechanism-row" },
+        el("span", { class: "mechanism-label" }, item.label || key),
+        el("div", { class: "mechanism-track" },
+          el("div", { class: "mechanism-fill", style: `width:${pct}%` })),
+        el("span", { class: "mechanism-prob" }, p === null ? "-" : `${fmt(pct, 1)}%`));
+    })));
+}
+
 function riskValue(answer) {
   if (answer === null || answer === undefined) return "-";
   if (typeof answer === "number") return fmt(answer, 1);
@@ -212,6 +236,7 @@ function symbolCard(code, s, jevEnabled) {
     latest ? el("p", { class: "small" },
       `마지막 봉 ${latest.timestamp} · 신호 ${latest.signals.join(", ")} · Jev ${jevEnabled ? (latest.jev ? "패턴 판별 활성" : "응답 없음") : "꺼짐(키 없음)"}`) : null,
     latest ? openingHourView(latest) : null,
+    latest ? mechanismBars(latest.primitive_mechanisms) : null,
     latest ? axesView(latest.scores) : null,
     latest ? el("p", { class: "small" }, `측정 안 된 항목: ${latest.unmeasured.join(", ")}`) : null,
     stripView(s.recent),
