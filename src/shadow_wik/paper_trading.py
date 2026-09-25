@@ -5,7 +5,7 @@ import math
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 Side = Literal["long", "short"]
 CloseReason = Literal["take_profit", "stop_loss", "max_hold", "pattern_invalidation", "manual"]
@@ -225,7 +225,11 @@ class PaperTradingHarness:
         self._write_event("paper_close", trade)
         return trade
 
-    def on_frame(self, frame: MarketFrame) -> dict[str, list[PaperTrade]]:
+    def on_frame(
+        self,
+        frame: MarketFrame,
+        allow_open: Callable[[PatternRule, MarketFrame], bool] | None = None,
+    ) -> dict[str, list[PaperTrade]]:
         if frame.price <= 0:
             raise ValueError("frame.price must be positive")
         now = _parse_time(frame.timestamp)
@@ -257,6 +261,8 @@ class PaperTradingHarness:
             if last_close is not None and (now - last_close).total_seconds() < rule.cooldown_seconds:
                 continue
             if rule.matches(frame.scores, frame.jev_response):
+                if allow_open is not None and not allow_open(rule, frame):
+                    continue
                 opened.append(self._open(rule, frame))
         return {"opened": opened, "closed": closed}
 
