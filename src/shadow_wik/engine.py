@@ -5,7 +5,7 @@ from typing import Any
 
 from .features import compute_features
 from .fingerprint import build_breakout_long_fingerprint
-from .jev import JevClient, build_questions, summarize_exit_focus, summarize_opening_hour_focus, summarize_scalp_patterns
+from .jev import JevClient, build_questions, summarize_exit_focus, summarize_opening_hour_focus, summarize_primitive_mechanisms, summarize_scalp_patterns
 from .models import MarketSnapshot
 from .personas import infer_market_persona_clusters, infer_position_personas
 from .scalp_patterns import pattern_catalog
@@ -134,6 +134,7 @@ class ShadowEngine:
             "jev": None,
             "scalp_patterns": {},
             "opening_hour": summarize_opening_hour_focus(None) if include_opening_hour else None,
+            "primitive_mechanisms": summarize_primitive_mechanisms(None) if include_opening_hour else None,
         }
         if jev is not None:
             result["jev"] = jev.evaluate(jev_state, questions)
@@ -141,6 +142,7 @@ class ShadowEngine:
                 result["scalp_patterns"] = summarize_scalp_patterns(result["jev"])
             if include_opening_hour:
                 result["opening_hour"] = summarize_opening_hour_focus(result["jev"])
+                result["primitive_mechanisms"] = summarize_primitive_mechanisms(result["jev"])
 
         fingerprint = build_breakout_long_fingerprint(result["features"], result["jev"])
         result["fingerprint"] = {
