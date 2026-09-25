@@ -1,10 +1,12 @@
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from shadow_wik.jev import build_questions, summarize_scalp_patterns
 from shadow_wik.paper_portfolio import PaperPortfolio
 from shadow_wik.paper_trading import MarketFrame, PaperTrade, PaperTradingHarness, PatternRule
+from shadow_wik.trader import LiveTrader
 from shadow_wik.scalp_patterns import (
     SCALP_PATTERNS,
     build_scalp_rules,
@@ -106,6 +108,55 @@ class PortfolioTests(unittest.TestCase):
         frame = MarketFrame("X", "2026-09-25T09:00:00+09:00", 100.0, {"EDGE": 100})
         result = harness.on_frame(frame, allow_open=lambda _rule, _frame: False)
         self.assertEqual(result["opened"], [])
+
+
+class FakeJev:
+    def evaluate(self, _state, questions):
+        answers = {}
+        for key, spec in questions.items():
+            if key.startswith("scalp_"):
+                answers[key] = {"noul": 0.95}
+            elif spec.get("type") == "noul":
+                answers[key] = {"noul": 0.7}
+        return {"answers": answers}
+
+
+def trending_bars(n: int):
+    base = datetime(2026, 9, 25, 9, 0, tzinfo=timezone(timedelta(hours=9)))
+    price = 10000.0
+    out = []
+    for i in range(n):
+        price += 20
+        out.append({
+            "time": (base + timedelta(minutes=i)).isoformat(timespec="seconds"),
+            "open": price - 20,
+            "high": price + 10,
+            "low": price - 30,
+            "close": price,
+            "volume": 1000 + i * 50,
+        })
+    return out
+
+
+class LiveScalpIntegrationTests(unittest.TestCase):
+    def test_low_default_threshold_can_open_paper_pattern_with_jev(self):
+        report = {
+            "zones": [],
+            "costs": {"fee_bps_per_side": 1.5, "slippage_bps_per_side": 2.0},
+            "exits": {"take_profit_pct": 0.6, "stop_loss_pct": 0.4, "max_hold_seconds": 900, "cooldown_seconds": 60},
+        }
+        with tempfile.TemporaryDirectory() as d:
+            trader = LiveTrader("005930", report, Path(d) / "paper.jsonl", jev=FakeJev())
+            history = trending_bars(45)
+            first_now = datetime.fromisoformat(history[-3]["time"]) + timedelta(minutes=2)
+            trader.on_bars(history[:-2], now=first_now)
+            second_now = datetime.fromisoformat(history[-1]["time"]) + timedelta(minutes=2)
+            events = trader.on_bars(history, now=second_now)
+            self.assertEqual(trader.paper_mode, "jev_scalp")
+            self.assertEqual(trader.validation_level, 0)
+            self.assertTrue(any(e["patterns"] for e in events))
+            self.assertTrue(trader.state()["open_trades"])
+            self.assertLess(trader.portfolio.state()["cash_krw"], 100_000_000)
 
 
 if __name__ == "__main__":
