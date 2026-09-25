@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from shadow_wik.bar_features import WINDOW  # noqa: E402
 from shadow_wik.engine import ShadowEngine  # noqa: E402
-from shadow_wik.trader import LiveTrader, snapshot_from_bars  # noqa: E402
+from shadow_wik.trader import LiveTrader, in_opening_hour, snapshot_from_bars  # noqa: E402
 
 REPORT = {"zones": [], "costs": {"fee_bps_per_side": 1.5, "slippage_bps_per_side": 2.0},
           "exits": {"take_profit_pct": 0.6, "stop_loss_pct": 0.4, "max_hold_seconds": 900, "cooldown_seconds": 60}}
@@ -62,6 +62,24 @@ class JevAdvisoryTests(unittest.TestCase):
         self.assertEqual(rows, 4)
         self.assertTrue(all(e["jev_trigger"] == "significant_zone" for e in events if e["jev_trigger"]))
         self.assertTrue(all(t["pattern"] == "zone:EDGE>=0" for e in events for t in e["opened"]))
+
+
+    def test_opening_hour_triggers_jev_without_zone(self):
+        jev = CountingJev()
+        with tempfile.TemporaryDirectory() as d:
+            trader = LiveTrader("005930", REPORT, Path(d) / "paper.jsonl", jev=jev)
+            bars = rising_bars(WINDOW + 40)
+            trader.on_bars(bars[:WINDOW + 5])
+            events = trader.on_bars(bars)
+        triggers = [e for e in events if e["jev_trigger"]]
+        self.assertTrue(triggers)
+        self.assertTrue(all(e["jev_trigger"] == "opening_hour" for e in triggers))
+        self.assertGreaterEqual(len(jev.calls), 3)
+
+    def test_opening_hour_boundary(self):
+        self.assertTrue(in_opening_hour("005930", "2026-09-23T09:59:00+09:00"))
+        self.assertFalse(in_opening_hour("005930", "2026-09-23T10:00:00+09:00"))
+        self.assertFalse(in_opening_hour("ND:PLTR", "2026-09-23T09:30:00+09:00"))
 
     def test_scalp_mode_requires_jev(self):
         with self.assertRaises(ValueError):
