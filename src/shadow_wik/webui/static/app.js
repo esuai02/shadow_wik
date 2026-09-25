@@ -202,9 +202,7 @@ function portfolioView(p) {
 
 function symbolCard(code, s, jevEnabled) {
   const latest = s.latest;
-  const modeBadge = s.paper_mode === "jev_scalp"
-    ? el("span", { class: "badge sig" }, "Jev 단타패턴")
-    : el("span", { class: "badge warn" }, "통계 zone fallback");
+  const modeBadge = el("span", { class: "badge sig" }, "오프닝 60분");
   return el("section", { class: "card" },
     el("div", { class: "head" },
       el("h2", {}, code),
@@ -215,16 +213,10 @@ function symbolCard(code, s, jevEnabled) {
       `마지막 봉 ${latest.timestamp} · 신호 ${latest.signals.join(", ")} · Jev ${jevEnabled ? (latest.jev ? "패턴 판별 활성" : "응답 없음") : "꺼짐(키 없음)"}`) : null,
     latest ? openingHourView(latest) : null,
     latest ? axesView(latest.scores) : null,
-    latest ? patternView(latest.patterns) : null,
     latest ? el("p", { class: "small" }, `측정 안 된 항목: ${latest.unmeasured.join(", ")}`) : null,
     stripView(s.recent),
-    recommendationView(code, latest),
-    el("h3", {}, "가상 포지션 / 최근 청산"),
-    tradesTable([...s.open_trades, ...s.closed_trades]),
-    s.performance.length ? el("p", { class: "small" }, s.performance.map((p) =>
-      `${p.pattern}: ${p.trades}회 승률 ${fmt(p.win_rate * 100, 1)}% 평균 ${fmt(p.average_return_pct, 3)}%`).join(" / ")) : null,
-    el("h3", {}, "참고용 기존 통계 zone"),
-    zonesView(zoneCache[code]));
+    el("h3", {}, "오프닝 60분 가상매매 이력"),
+    tradesTable([...s.open_trades, ...s.closed_trades]));
 }
 
 function showError(err) {
