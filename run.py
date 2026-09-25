@@ -471,7 +471,7 @@ def cmd_zones(args: argparse.Namespace) -> int:
 
 
 def cmd_ui(args: argparse.Namespace) -> int:
-    """Local paper-trading UI; trades virtually only inside significant zones."""
+    """Local paper UI; Jev scalp hypotheses trade when Jev is configured, otherwise significant-zone fallback."""
     load_dotenv()
     ensure_state()
     from shadow_wik.jev import JevClient
@@ -646,7 +646,7 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--slippage-bps", type=float, help="per-side slippage bps (default KRX 5, US 3)")
     sp.set_defaults(func=cmd_zones)
 
-    sp = sub.add_parser("ui", help="Local paper-trading UI (127.0.0.1); trades only in significant zones")
+    sp = sub.add_parser("ui", help="Local paper UI (127.0.0.1); Jev scalp patterns + 100M KRW paper portfolio")
     sp.add_argument("codes", nargs="+")
     sp.add_argument("--port", type=int, default=8765)
     sp.add_argument("--interval", type=float, default=60.0, help="seconds between minute-bar polls")
