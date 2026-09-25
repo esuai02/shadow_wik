@@ -474,7 +474,7 @@ def cmd_ui(args: argparse.Namespace) -> int:
     """Local paper UI; Jev scalp hypotheses trade when Jev is configured, otherwise significant-zone fallback."""
     load_dotenv()
     ensure_state()
-    from shadow_wik.jev import JevClient
+    from shadow_wik.jev import JevClient, JevError
     from shadow_wik.kiwoom_feed import KiwoomFeedError, KiwoomQuoteClient
     from shadow_wik.notify_telegram import TelegramError, TelegramNotifier
     from shadow_wik.webui.server import Runtime, serve
@@ -485,14 +485,24 @@ def cmd_ui(args: argparse.Namespace) -> int:
     except KiwoomFeedError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    jev = JevClient.from_env() if os.getenv("TYPESAFE_API_KEY") else None
+    jev = None
+    if os.getenv("TYPESAFE_API_KEY") or os.getenv("TYPESAFE_KEY_FILE"):
+        try:
+            jev = JevClient.from_env()
+        except JevError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+    if args.paper_mode == "jev_scalp" and jev is None:
+        print("run.py: --paper-mode jev_scalp needs TYPESAFE_API_KEY or TYPESAFE_KEY_FILE", file=sys.stderr)
+        return 2
+    print(f"paper mode: {args.paper_mode} · jev: {'advisory (trigger-gated, logged)' if jev and args.paper_mode == 'statistical_zone' else ('trading' if jev else 'off')}", flush=True)
     try:
         notifier = TelegramNotifier.from_env()
     except TelegramError as exc:
         print(str(exc), file=sys.stderr)
         return 2
     print(f"telegram alerts: {'on' if notifier else 'off (TELEGRAM_CHAT_ID / token not set)'}", flush=True)
-    serve(Runtime(client, reports, STATE, args.interval, jev=jev, notifier=notifier), args.port)
+    serve(Runtime(client, reports, STATE, args.interval, jev=jev, notifier=notifier, paper_mode=args.paper_mode), args.port)
     return 0
 
 
@@ -646,13 +656,15 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--slippage-bps", type=float, help="per-side slippage bps (default KRX 5, US 3)")
     sp.set_defaults(func=cmd_zones)
 
-    sp = sub.add_parser("ui", help="Local paper UI (127.0.0.1); Jev scalp patterns + 100M KRW paper portfolio")
+    sp = sub.add_parser("ui", help="Local paper UI (127.0.0.1); significant zones by default, Jev advisory")
     sp.add_argument("codes", nargs="+")
     sp.add_argument("--port", type=int, default=8765)
     sp.add_argument("--interval", type=float, default=60.0, help="seconds between minute-bar polls")
     sp.add_argument("--pages", type=int, default=40, help="history pages if no saved zone report")
     sp.add_argument("--fee-bps", type=float)
     sp.add_argument("--slippage-bps", type=float)
+    sp.add_argument("--paper-mode", choices=["statistical_zone", "jev_scalp"], default="statistical_zone",
+                    help="statistical_zone: trade only significant zones (default); jev_scalp: trade Jev scalp hypotheses")
     sp.set_defaults(func=cmd_ui)
     return p
 

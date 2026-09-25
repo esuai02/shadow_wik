@@ -24,7 +24,8 @@ POST_ROUTES = {"/api/decision": api_decision.handle, "/api/settings": api_settin
 
 class Runtime:
     def __init__(self, client: KiwoomQuoteClient, reports: dict[str, dict[str, Any]], state_dir: Path,
-                 interval: float, jev: Any = None, notifier: TelegramNotifier | None = None) -> None:
+                 interval: float, jev: Any = None, notifier: TelegramNotifier | None = None,
+                 paper_mode: str = "statistical_zone") -> None:
         self.client = client
         self.reports = reports
         self.interval = interval
@@ -45,6 +46,8 @@ class Runtime:
                 jev=jev,
                 portfolio=self.portfolio,
                 validation_level=self.validation_level,
+                paper_mode=paper_mode,
+                jev_log_path=state_dir / "jev_decisions.sqlite",
             )
             for code, report in reports.items()
         }

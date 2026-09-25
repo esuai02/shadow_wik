@@ -1,8 +1,9 @@
-"""Bars -> fingerprint -> Jev scalp hypotheses -> funded live paper trading.
+"""Bars -> fingerprint -> significance zones (or explicit Jev scalp mode) -> funded live paper trading.
 
-Paper only: this module has no broker order path. With Jev configured, live entries
-use the scalp hypothesis library and dashboard validation level. Without Jev, the
-older statistically-significant zone rules remain a conservative fallback.
+Paper only: this module has no broker order path. Default mode trades only zones marked
+`significant` by zones.evaluate_zones; Jev, when configured, is advisory: asked on
+pre-registered triggers, shown in the UI and logged for calibration. The Jev scalp
+hypothesis library trades only when paper_mode="jev_scalp" is chosen explicitly.
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from typing import Any
 from .bar_features import WINDOW, snapshot_from_bars
 from .engine import ShadowEngine
 from .jev import JevClient
+from .journal import DecisionLedger
 from .models import MarketSnapshot
 from .paper_portfolio import PaperPortfolio
 from .paper_trading import MarketFrame, PaperTradingHarness
@@ -25,6 +27,8 @@ from .zones import CostModel, evaluate_zones, significant_rules
 
 RECENT_FRAMES = 120
 BAR_SECONDS = timedelta(seconds=60)
+PAPER_MODES = ("statistical_zone", "jev_scalp")
+JEV_COOLDOWN = timedelta(minutes=10)
 KRX_OPEN, KRX_CLOSE = "09:00", "15:20"  # half-open: last bar used is 15:19
 
 
@@ -78,11 +82,20 @@ class LiveTrader:
     jev: JevClient | None = None
     portfolio: PaperPortfolio | None = None
     validation_level: int = 0
+    # "statistical_zone": trade only significant zones; Jev (if set) is advisory, trigger-gated and logged.
+    # "jev_scalp": trade Jev scalp hypotheses every bar (must be chosen explicitly).
+    paper_mode: str = "statistical_zone"
+    jev_log_path: Path | None = None
 
     def __post_init__(self) -> None:
         costs = CostModel(**self.report["costs"])
         self.validation_level = max(0, min(100, int(self.validation_level)))
-        self.paper_mode = "jev_scalp" if self.jev is not None else "statistical_zone"
+        if self.paper_mode not in PAPER_MODES:
+            raise ValueError(f"trader.py: paper_mode must be one of {PAPER_MODES}")
+        if self.paper_mode == "jev_scalp" and self.jev is None:
+            raise ValueError("trader.py: paper_mode 'jev_scalp' needs a Jev client")
+        self.last_jev_at: datetime | None = None
+        self._jev_ledger: DecisionLedger | None = None
         rules = build_scalp_rules(self.validation_level) if self.paper_mode == "jev_scalp" else significant_rules(self.report)
         self.harness = PaperTradingHarness(
             rules,
@@ -95,6 +108,31 @@ class LiveTrader:
         self.last_time: str | None = None
         self.recent: deque[dict[str, Any]] = deque(maxlen=RECENT_FRAMES)
         self.lock = threading.Lock()
+
+    def _jev_trigger(self, frame: MarketFrame, analysis: dict[str, Any], zone: dict[str, Any]) -> str | None:
+        """Why Jev should be asked about this bar, or None. Scalp mode asks every bar (its own design);
+        zone mode asks only on pre-registered triggers, at most once per JEV_COOLDOWN per symbol."""
+        if self.paper_mode == "jev_scalp":
+            return "scalp_mode_every_bar"
+        now = datetime.fromisoformat(frame.timestamp)
+        if self.last_jev_at is not None and now - self.last_jev_at < JEV_COOLDOWN:
+            return None
+        signals = [x["code"] for x in analysis["signals"] if x["code"] != "NO_EDGE"]
+        reason = "significant_zone" if zone["significant"] else ("signal:" + ",".join(signals) if signals else None)
+        if reason is not None:
+            self.last_jev_at = now
+        return reason
+
+    def _log_jev(self, frame: MarketFrame, analysis: dict[str, Any], response: dict[str, Any] | None) -> None:
+        """Keep every Jev answer for later outcome resolution and calibration (never used to trade here)."""
+        if self.jev_log_path is None or not response or "answers" not in response:
+            return
+        if self._jev_ledger is None:
+            self.jev_log_path.parent.mkdir(parents=True, exist_ok=True)
+            self._jev_ledger = DecisionLedger(self.jev_log_path)
+        snap = analysis["snapshot"]
+        self._jev_ledger.record_response(timestamp=frame.timestamp, symbol=self.symbol, regime=snap["regime_hint"],
+                                         horizon_minutes=snap["horizon_minutes"], response=response)
 
     def set_validation_level(self, level: int) -> None:
         self.validation_level = max(0, min(100, int(level)))
@@ -153,18 +191,20 @@ class LiveTrader:
                 continue
             jev_view = None
             scalp_probabilities: dict[str, float] = {}
-            if not warmup and self.jev is not None:
+            zone = zone_status(frame.scores, self.report)
+            jev_trigger = None if warmup or self.jev is None else self._jev_trigger(frame, analysis, zone)
+            if jev_trigger is not None:
                 try:
                     live_analysis = self.engine.analyze(
                         MarketSnapshot.from_dict(analysis["snapshot"]),
                         jev=self.jev,
-                        include_scalp_patterns=True,
+                        include_scalp_patterns=self.paper_mode == "jev_scalp",
                     )
                     jev_view = live_analysis.get("jev")
                     scalp_probabilities = live_analysis.get("scalp_patterns", {})
+                    self._log_jev(frame, analysis, jev_view)
                 except Exception as exc:  # Jev is advisory; a failed call must not fabricate a pattern
                     jev_view = {"error": f"{type(exc).__name__}: {exc}"}
-            zone = zone_status(frame.scores, self.report)
             with self.lock:
                 if not warmup and self.last_time[:10] != frame.timestamp[:10]:
                     day_closed = self.harness.close_all(
@@ -205,6 +245,7 @@ class LiveTrader:
                     "patterns": patterns,
                     "pattern_entered": bool(result["opened"]),
                     "jev": jev_view,
+                    "jev_trigger": jev_trigger,
                     "unmeasured": analysis["snapshot"]["metadata"].get("unmeasured", []),
                     "opened": [t.to_dict() for t in result["opened"]],
                     "closed": [t.to_dict() for t in result["closed"]],

@@ -146,7 +146,7 @@ class LiveScalpIntegrationTests(unittest.TestCase):
             "exits": {"take_profit_pct": 0.6, "stop_loss_pct": 0.4, "max_hold_seconds": 900, "cooldown_seconds": 60},
         }
         with tempfile.TemporaryDirectory() as d:
-            trader = LiveTrader("005930", report, Path(d) / "paper.jsonl", jev=FakeJev())
+            trader = LiveTrader("005930", report, Path(d) / "paper.jsonl", jev=FakeJev(), paper_mode="jev_scalp")
             history = trending_bars(45)
             first_now = datetime.fromisoformat(history[-3]["time"]) + timedelta(minutes=2)
             trader.on_bars(history[:-2], now=first_now)

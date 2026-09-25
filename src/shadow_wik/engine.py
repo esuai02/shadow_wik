@@ -14,6 +14,31 @@ from .trade_lifecycle import TradePlan, build_trade_state
 from .visual_grammar import build_visual_state
 
 
+# Features whose weight is mostly unobservable from price/volume bars alone (see features.py).
+MOSTLY_UNOBSERVED_FEATURES = (
+    "hidden_flow", "scheduled_news_risk", "unscheduled_news_risk", "news_shock_score", "algorithmic_capture_risk",
+)
+
+
+def mask_unobserved(state: dict[str, Any], unobserved: set[str]) -> dict[str, Any]:
+    """Send unobserved inputs to Jev as null instead of their neutral defaults.
+
+    A neutral default (e.g. 50) otherwise reads as a measurement: Jev judged a
+    `hidden_flow` catalyst from all-default flow fields in the 2026-09-25 E0 call.
+    """
+    info = state["information"]
+    masked_info = {k: (None if "information" in unobserved else v) for k, v in info.items() if k != "news"}
+    masked_info["news"] = {k: None for k in info["news"]} if "news" in unobserved else info["news"]
+    return {
+        **state,
+        "features": {k: (None if k in MOSTLY_UNOBSERVED_FEATURES else v) for k, v in state["features"].items()},
+        "microstructure": {k: (None if k in unobserved else v) for k, v in state["microstructure"].items()},
+        "information": masked_info,
+        "unobserved_fields": sorted(unobserved),
+        "rules": {**state["rules"], "unobserved": "null means not observed. Do not infer flow, news, or catalysts from missing values."},
+    }
+
+
 class ShadowEngine:
     def analyze(
         self,
@@ -76,6 +101,9 @@ class ShadowEngine:
                 "final_authority": "Jev exit_action is advisory. The human owns the final sell decision.",
             },
         }
+        unobserved = set(s.metadata.get("unmeasured", []))
+        if unobserved:
+            jev_state = mask_unobserved(jev_state, unobserved)
         if trade_state is not None:
             jev_state["trade_lifecycle"] = trade_state
         if include_scalp_patterns:
