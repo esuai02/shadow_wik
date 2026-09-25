@@ -7,6 +7,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from .scalp_patterns import SCALP_PATTERNS
+
 DEFAULT_BASE_URL = "https://api.typesafe.ai"
 DEFAULT_MODEL = "jev-latest"
 
@@ -111,7 +113,38 @@ def build_exit_questions() -> dict[str, Any]:
     }
 
 
-def build_questions(*, include_exit: bool = False) -> dict[str, Any]:
+def build_scalp_pattern_questions() -> dict[str, Any]:
+    questions: dict[str, Any] = {}
+    for pattern in SCALP_PATTERNS:
+        questions[pattern.jev_question] = {
+            "type": "noul",
+            "instructions": (
+                f"Does the supplied live intraday market state currently match the scalp pattern "
+                f"'{pattern.label}' strongly enough that its stated short-horizon thesis is more likely "
+                f"than its falsification condition in the next observation window? "
+                "Judge the pattern state only; do not estimate realized profitability."
+            ),
+            "criteria": {
+                "true": pattern.thesis,
+                "false": pattern.falsification,
+            },
+        }
+    return questions
+
+
+def summarize_scalp_patterns(response: dict[str, Any] | None) -> dict[str, float]:
+    if not response:
+        return {}
+    answers = response.get("answers", {})
+    out: dict[str, float] = {}
+    for pattern in SCALP_PATTERNS:
+        value = answers.get(pattern.jev_question, {}).get("noul")
+        if isinstance(value, (int, float)):
+            out[pattern.key] = round(max(0.0, min(1.0, float(value))), 6)
+    return out
+
+
+def build_questions(*, include_exit: bool = False, include_scalp: bool = False) -> dict[str, Any]:
     questions = {
         "breakout_next_window": {
             "type": "noul",
@@ -182,6 +215,8 @@ def build_questions(*, include_exit: bool = False) -> dict[str, Any]:
             ],
         },
     }
+    if include_scalp:
+        questions.update(build_scalp_pattern_questions())
     if include_exit:
         questions.update(build_exit_questions())
     return questions
